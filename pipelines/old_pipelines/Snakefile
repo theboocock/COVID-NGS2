@@ -1,0 +1,161 @@
+
+#https://snakemake.bitbucket.io/snakemake-tutorial.html
+#@author James Boocock
+#@date March 31, 2020
+
+## We should change this input
+configfile:  "/media/theboocock/data/Dropbox/COVID19/ngs/pipelines/defaults.json"
+
+import configparser
+import pyfasta
+SOFTWARE_PATH=config["PATHS"]["SOFTWARE_FOLDER"]
+PICARD_PATH=SOFTWARE_PATH + config["PATHS"]["PICARD_PATH"]
+GATK_PATH=SOFTWARE_PATH + config["PATHS"]["GATK_PATH"]
+SCRIPTS_DIR=config["PATHS"]["SCRIPTS_DIR"]
+REFERENCE=config["PATHS"]["REFERENCE"]
+
+HAPLOTYPE_CORES=config["PARAMS"]["HAPLOTYPE_CORES"]
+
+input_fasta = pyfasta.Fasta(REFERENCE)
+intervals=list(input_fasta.keys())
+#intervals = [interval.strip().replace(" ","_").replace(",","") for interval in intervals]
+
+fastq_input_pairs = {}
+sample_names = {}
+try:
+    config["sample_list"] 
+except KeyError:
+    sys.stderr.write("Please specifiy the sample input file --sample in on the command line")
+    sys.exit(1)
+samples=[]
+with open(config["sample_list"]) as in_samples:
+    for sample_row in in_samples:
+        sample = sample_row.split()[0]
+        samples.append(sample)
+        r1 = sample_row.split()[1]
+        r2 = sample_row.split()[2]
+        fastq_input_pairs[sample] = (r1,r2)
+    #TODO: Parse sample names so that they can be joint called together.
+    #sample_names
+print(samples)
+input_folder=config["in_folder"]
+
+def get_fq1(wildcards):
+    out_fastq = os.path.join(input_folder,fastq_input_pairs[wildcards.sample][0])
+    return os.path.join(input_folder,fastq_input_pairs[wildcards.sample][0])
+
+def get_fq2(wildcards):
+    return os.path.join(input_folder, fastq_input_pairs[wildcards.sample][1])
+
+
+rule all:
+    input:
+        expand("outputs/genomesdb/db_{intervals}/complete.txt",intervals=intervals)
+        #"outputs/vcf/all.vcf"
+        #"outputs/genomicsdb/db_{intervals}/complete.txt"
+        #expand("outputs/{sample}.bam", sample=samples)
+rule bwa_map:
+    input:
+        read_one=get_fq1,
+    output:
+        temp("outputs/{sample}.bam")
+    params:
+        cluster="-l h_rt=24:00:00 -l h_data=16G -cwd",
+        rg="@RG\\tID:{sample}\\tSM:{sample}\\tPL:illumina\\tLB:lib1\\tPU:unit1",
+        read_two=get_fq2
+    log:
+        "logs/align/{sample}.log"
+    shell:
+        #echo {input.read_one} {input.read_two} 2> {log}"
+        "{SCRIPTS_DIR}/align.sh '{params.rg}' {REFERENCE} {input.read_one} {params.read_two} {output} {log}  "
+
+rule picard_sort:
+    input:
+        "outputs/{sample}.bam"
+    output:
+        temp("outputs/{sample}.sorted.bam")
+    params:
+        order="SORT_ORDER=coordinate",
+        tmpdir="-Djava.io.tmpdir=tmpdir",
+        cluster="-l h_rt=24:00:00 -l h_data=16G -cwd"
+    log:
+        "logs/picard_sort/{sample}.log"
+    shell:
+        "{SCRIPTS_DIR}/picard_sort.sh {params.tmpdir} {PICARD_PATH} {input} {output} {params.order} {log}"
+
+rule picard_mark_duplicates:
+    input:
+        "outputs/{sample}.sorted.bam"
+    output:
+        bam_out=temp("outputs/md/{sample}.sorted.md.bam"),
+        metrics_out="outputs/md/{sample}.metrics.txt"
+    log:
+        "logs/picard_mark_duplicates/{sample}.log"
+    params:
+        tmpdir="-Djava.io.tmpdir=tmpdir",
+        cluster="-l h_rt=24:00:00 -l h_data=16G -cwd"
+    shell:
+        "{SCRIPTS_DIR}/picard_md.sh {params.tmpdir} {PICARD_PATH} {input} {output.bam_out} {output.metrics_out} {log}"
+
+rule picard_index:
+    input:
+        "outputs/md/{sample}.sorted.md.bam"
+    output:
+        temp("outputs/md/{sample}.sorted.md.bam.bai")
+    log:
+        "logs/picard_index/{sample}.log"
+    params:
+        tmpdir="-Djava.io.tmpdir=tmpdir",
+        cluster="-l h_rt=24:00:00 -l h_data=16G -cwd"
+    shell:
+        "{SCRIPTS_DIR}/picard_index.sh {params.tmpdir} {PICARD_PATH} {input} {output} {log}"
+
+rule haplotype_caller:
+    input:
+        bam="outputs/md/{sample}.sorted.md.bam",
+        bam_index="outputs/md/{sample}.sorted.md.bam.bai"
+    output:
+        "outputs/gvcfs/{sample}.g.vcf"
+    log:
+        "logs/haplotype_caller/{sample}.log"
+    params:
+        tmpdir="-Djava.io.tmpdir=tmpdir",
+        cluster="-l time=24:00:00 -l h_data=1.5G -pe shared 12 -cwd"
+    shell:
+        "{SCRIPTS_DIR}/haplotype_caller.sh {GATK_PATH} {REFERENCE} {input.bam} {output} {HAPLOTYPE_CORES}"
+
+def _gatk_multi_arg(flag, files):
+    cmd_string = flag + flag.join(files)
+    return cmd_string
+
+rule genomics_db_import:
+    input:
+        gvcfs = expand("outputs/gvcfs/{sample}.g.vcf", sample=samples)
+    output:
+        "outputs/genomesdb/db_{intervals}/complete.txt",
+    log:
+        "logs/genomicsdb/{intervals}.log"
+    run:
+        shell("""{SCRIPTS_DIR}/make_genomicsdb.sh {GATK_PATH} {REFERENCE} {output} {intervals} {input.gvcfs}""")
+
+#rule haplotype_joint: 
+#        intervals="outputs/genomesdb/db_{intervals}"
+
+
+#rule haplotype_joint:
+#    input:
+#        expand("outputs/gvcfs/{sample}.g.vcf",sample=samples)
+#    output:
+#        "outputs/vcf/all.vcf"
+#    log:
+#        "logs/haplotype_caller/joint_calling.log"
+#    params:
+#        tmpdir="-Djava.io.tmpdir=tmpdir"
+#    run:
+#       bams = _gatk_multi_arg(" --variant ", input)
+#       shell("java -Xmx64g {params.tmpdir} -jar {GATK_PATH}"
+#               " -T GenotypeGVCFs "
+#               " -R {REFERENCE} "
+#                " -nt 8 "
+#                "{bams}"
+#                " -o {output} ")

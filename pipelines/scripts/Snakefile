@@ -1,0 +1,108 @@
+import glob
+
+#https://snakemake.bitbucket.io/snakemake-tutorial.html
+
+in_dir = "/u/home/s/smilefre/project-kruglyak/fastqs_sra/C/" 
+samples = glob.glob(in_dir + "*_1.fastq.gz")
+samples = [os.path.basename(sample).split("_1.fastq.gz")[0] for sample in samples]
+print(samples)
+
+PICARD_PATH="/u/home/s/smilefre/scripts/vcf/picard.jar"  
+GATK_PATH="/u/home/s/smilefre/scripts/vcf/gatk-4.1.4.1/gatk"
+
+REFERENCE="/u/home/s/smilefre/project-kruglyak/ref/saccer3_with_alt_chin.fasta"
+rule all:
+    input:
+        expand("outputs/gvcfs/{sample}.g.vcf", sample=samples)
+        #expand("outputs/{sample}.bam", sample=samples)
+rule bwa_map:
+    input:
+        read_one=in_dir+ "{sample}_1.fastq.gz",
+        read_two=in_dir + "{sample}_2.fastq.gz" 
+    output:
+        temp("outputs/{sample}.bam")
+    params:
+        cluster="-l h_rt=24:00:00 -l h_data=16G -cwd",
+        rg="@RG\\tID:{sample}\\tSM:{sample}\\tPL:illumina\\tLB:lib1\\tPU:unit1"
+    log:
+        "logs/minimap2/{sample}.log"
+    shell:
+        #echo {input.read_one} {input.read_two} 2> {log}"
+        "./minimap.sh '{params.rg}' {REFERENCE} {input.read_one} {input.read_two} {output} {log}  "
+
+rule picard_sort:
+    input:
+        "outputs/{sample}.bam"
+    output:
+        temp("outputs/{sample}.sorted.bam")
+    params:
+        order="SORT_ORDER=coordinate",
+        tmpdir="-Djava.io.tmpdir=tmpdir",
+        cluster="-l h_rt=24:00:00 -l h_data=16G -cwd"
+    log:
+        "logs/picard_sort/{sample}.log"
+    shell:
+        "./picard_sort.sh {params.tmpdir} {PICARD_PATH} {input} {output} {params.order} {log}"
+
+rule picard_mark_duplicates:
+    input:
+        "outputs/{sample}.sorted.bam"
+    output:
+        bam_out=temp("outputs/md/{sample}.sorted.md.bam"),
+        metrics_out="outputs/md/{sample}.metrics.txt"
+    log:
+        "logs/picard_mark_duplicates/{sample}.log"
+    params:
+        tmpdir="-Djava.io.tmpdir=tmpdir",
+        cluster="-l h_rt=24:00:00 -l h_data=16G -cwd"
+    shell:
+        "./picard_md.sh {params.tmpdir} {PICARD_PATH} {input} {output.bam_out} {output.metrics_out} {log}"
+
+rule picard_index:
+    input:
+        "outputs/md/{sample}.sorted.md.bam"
+    output:
+        temp("outputs/md/{sample}.sorted.md.bam.bai")
+    log:
+        "logs/picard_index/{sample}.log"
+    params:
+        tmpdir="-Djava.io.tmpdir=tmpdir",
+        cluster="-l h_rt=24:00:00 -l h_data=16G -cwd"
+    shell:
+        "./picard_index.sh {params.tmpdir} {PICARD_PATH} {input} {output} {log}"
+
+rule haplotype_caller:
+    input:
+        bam="outputs/md/{sample}.sorted.md.bam",
+        bam_index="outputs/md/{sample}.sorted.md.bam.bai"
+    output:
+        "outputs/gvcfs/{sample}.g.vcf"
+    log:
+        "logs/haplotype_caller/{sample}.log"
+    params:
+        tmpdir="-Djava.io.tmpdir=tmpdir",
+        cluster="-l time=24:00:00 -l h_data=1.5G -pe shared 12 -cwd"
+    shell:
+        "./haplotype_caller.sh {GATK_PATH} {REFERENCE} {input.bam} {output}"
+ 
+def _gatk_multi_arg(flag, files):
+    cmd_string = flag + flag.join(files)
+    return cmd_string 
+
+#rule haplotype_joint:
+#    input:
+#        expand("outputs/gvcfs/{sample}.g.vcf",sample=samples)
+#    output:
+#        "outputs/vcf/all.vcf"
+#    log:
+#        "logs/haplotype_caller/joint_calling.log"
+#    params:
+#        tmpdir="-Djava.io.tmpdir=tmpdir"
+#    run:
+ #       bams = _gatk_multi_arg(" --variant ", input)
+  #      shell("java -Xmx64g {params.tmpdir} -jar {GATK_PATH}"
+   #		" -T GenotypeGVCFs "
+   	#	" -R {REFERENCE} "
+    #    " -nt 8 "  
+   	#	"{bams}"
+   		#" -o {output} ") 

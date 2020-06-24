@@ -1,0 +1,104 @@
+
+#https://snakemake.bitbucket.io/snakemake-tutorial.html
+#@author James Boocock
+#@date March 31, 2020
+
+## We should change this input
+configfile:  "/media/theboocock/data/Dropbox/COVID19/ngs/pipelines/defaults.yaml"
+
+import configparser
+import pyfasta
+import os
+
+SOFTWARE_PATH=config["PATHS"]["SOFTWARE_FOLDER"]
+PICARD_PATH=SOFTWARE_PATH + config["PATHS"]["PICARD_PATH"]
+GATK_PATH=SOFTWARE_PATH + config["PATHS"]["GATK_PATH"]
+SCRIPTS_DIR=config["PATHS"]["SCRIPTS_DIR"]
+NUCMER_TO_VCF=os.path.join(SOFTWARE_PATH, "nucmer2vcf/my-mummer-2-vcf.py") 
+
+REFERENCE=config["PATHS"]["SARS_REF"]
+print(REFERENCE)
+HAPLOTYPE_CORES=config["PARAMS"]["HAPLOTYPE_CORES"]
+
+public_gis = pyfasta.Fasta(config["gisaid_in"])
+samples = list(public_gis.keys())
+sample_mapping = { (x.replace("/","_")):x for x in samples }
+sample_lists = list(sample_mapping.keys())
+
+CWD=os.getcwd()
+
+###sample_lists= ["Australia_VIC1262_2020"]
+
+def get_original_id(wildcards):
+    return(sample_mapping[wildcards.sample])
+
+rule all:
+    input:
+        #"outputs/vcf/all.vcf"
+        "outputs/final/all.vcf.gz"
+        #"outputs/genomicsdb/db_{intervals}/complete.txt"
+        #expand("outputs/{sample}.bam", sample=samples)
+rule split_public_data:
+    output:
+        "outputs/public_fasta/{sample}.fasta"
+    params:
+        input_fasta=config["gisaid_in"],
+        original_id=get_original_id
+         
+    shell:
+        "{SCRIPTS_DIR}/bioawk.sh {params.input_fasta} {params.original_id} {output}" 
+     
+rule nucmer_align:
+    input:
+        "outputs/public_fasta/{sample}.fasta"
+    shadow: "minimal"
+    output:
+        "outputs/alignments/{sample}.nucmer"
+    log:
+        "logs/alignment/{sample}.log" 
+    shell:
+        "{SCRIPTS_DIR}/nucmer.sh {REFERENCE} {input} {output} {log}" 
+    
+rule nucmer_show_snps:
+    input:
+        "outputs/alignments/{sample}.nucmer" 
+    shadow: "minimal"
+    output:
+        "outputs/snps/{sample}.snp" 
+    log:
+        "logs/snps/{sample}.snp" 
+    shell:
+        "{SCRIPTS_DIR}/show_snps.sh {input} {output} {REFERENCE} {log} {CWD}" 
+
+rule generate_vcfs:
+    input:
+        "outputs/snps/{sample}.snp"
+    output:
+        vcf="outputs/vcf/{sample}.vcf.gz",
+        tbi="outputs/vcf/{sample}.vcf.gz.tbi"
+    log:
+        "logs/vcfs/{sample}.log"
+    shell:
+        "{SCRIPTS_DIR}/nucmer_to_vcf.sh {NUCMER_TO_VCF} {input} {output.vcf} {REFERENCE} {log}"
+
+rule write_vcf_file_list:
+    input:
+        expand("outputs/vcf/{sample}.vcf.gz",sample=sample_lists)
+    output:
+        "outputs/vcf_file_list.txt"
+    run:
+        with open(output[0], "w") as out:
+            for f in input:
+                out.write(f + "\n")
+ 
+            
+rule merge_vcfs:
+    input:
+        "outputs/vcf_file_list.txt"
+    output:
+        vcf="outputs/final/all.vcf.gz",
+        tbi="outputs/final/all.vcf.gz.tbi"
+    log:
+        "logs/vcfs/all.log"
+    shell:
+        "{SCRIPTS_DIR}/merge_vcfs.sh {output.vcf} {log} {input}" 

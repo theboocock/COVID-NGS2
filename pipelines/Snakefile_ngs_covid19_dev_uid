@@ -1,0 +1,314 @@
+#https://snakemake.bitbucket.io/snakemake-tutorial.html
+#@author James Boocock
+#@date March 31, 2020
+
+## We should change this input
+configfile:  workflow.current_basedir + "/defaults.yaml" 
+CONFIGFILE= workflow.current_basedir + "/defaults.yaml" 
+
+wildcard_constraints: 
+    sample="(?!merged)([a-z0-9A-Z-_]+)",
+    intervals="(?!merged)([a-z0-9A-Z-_]+)",
+    depth="(?!merged)([a-z0-9A-Z-_]+)",
+    uid_lib="(?!merged)([a-z0-9A-Z-_]+)"
+import configparser
+import pyfasta
+SOFTWARE_PATH=config["PATHS"]["SOFTWARE_FOLDER"]
+PICARD_PATH=SOFTWARE_PATH + config["PATHS"]["PICARD_PATH"]
+GATK_PATH=SOFTWARE_PATH + config["PATHS"]["GATK_PATH"]
+SCRIPTS_DIR=config["PATHS"]["SCRIPTS_DIR"]
+REFERENCE=config["PATHS"]["REFERENCE"]
+SARS_REF=config["PATHS"]["SARS_REF"]
+MAPQ_FILT=config["PARAMS"]["MAPQ_FILT"]
+GISAID_FASTA=config["PATHS"]["GISAID_FASTA"]
+GISAID_METADATA=config["PATHS"]["GISAID_METADATA"]
+
+
+SITES_TO_MASK=config["PATHS"]["SITES_TO_MASK"]
+OLIGO_POOL_BED=config["PATHS"]["OPOOL_FILE"]
+ARCTIC_FILE=config["PATHS"]["ARCTIC_FILE"]
+
+TAXON_IN=config["PATHS"]["TAXON_ID"]
+
+HAPLOTYPE_CORES=config["PARAMS"]["HAPLOTYPE_CORES"]
+MIN_DEPTH=config["PARAMS"]["MIN_DEPTH"]
+MIN_QUAL=config["PARAMS"]["MIN_QUAL"]
+FRAC_STRAND=config["PARAMS"]["FRAC_STRAND"]
+#DEPTH_ARRAY=range(MIN_DEPTH,MIN_DEPTH*5,MIN_DEPTH)
+
+input_fasta = pyfasta.Fasta(REFERENCE)
+intervals=[config["PARAMS"]["SARS_GENOME_NAME"]]
+
+TRIMMOMATIC_ADAPTERS=config["PATHS"]["TRIMMOMATIC_ADAPTERS"]
+TRIMMOMATIC_PATH=config["PATHS"]["TRIMMOMATIC_PATH"]
+
+BRACKEN_PATH=config["PATHS"]["BRACKEN_PATH"]
+
+#intervals=list(input_fasta.keys())
+#intervals = [interval.strip().replace(" ","_").replace(",","") for interval in intervals]
+
+include: "rules/utils.smk"
+
+depth_range = [5]
+min_cov = 0.9
+
+taxon_dict = read_taxid(TAXON_IN)
+metadata=fastq_match(config)
+samples=metadata["sample"]
+
+### metadata["sample"]
+#### metadata["strain"]
+
+
+rg_name=metadata["strain"]
+#mapped_uid, sample_names_hash, mapped_uids_read_one, mapped_uids_read_two = uid_library_to_sample_name_and_readgroup()
+mapped_uid, sample_names_hash, mapped_uids_read_one, mapped_uids_read_two = uid_library_to_sample_name() 
+print(sample_names_hash)
+#with open("sample_mapping.txt","w") as out_f:
+#    for key, items in mapped_uid.items():
+#        print(key)
+#        print(items)
+#        out_f.write(str(key) + " " + " ".join([str(o) for o in items]) + "\n")
+rule all:
+    input:
+        expand("outputs/md/merged/{intervals}/{uid_lib}.bam",intervals=intervals, uid_lib=mapped_uid.keys()),
+        expand("outputs/consensus/merged/{intervals}/all_{depth}.fasta", depth=depth_range, intervals=intervals),
+        expand("outputs/abundances/merged/{sample}.bracken", sample=mapped_uid.keys()), 
+        expand("outputs/coverage/merged/coverage_plots/{intervals}/{sample}.png", intervals=intervals, sample=mapped_uid.keys()), 
+        "outputs/ncov/merged/all.fasta",
+        "outputs/bcftools_vcfs/merged/all.vcf.gz",
+       # TODO check if it works#
+      #"test.png",
+        expand("outputs/coverage/coverage_plots/{intervals}/{sample}.png", intervals=intervals, sample=samples), 
+        expand("outputs/kraken_bams/{intervals}/{sample}.kraken.bam",intervals=intervals,sample=samples),
+        #expand("outputs/kraken_bams/{intervals}/{sample}.kraken.bam",sample=samples,intervals=intervals),
+        #expand("outputs/vcfs_filt/{intervals}/all.filt.vcf.gz",intervals=intervals),
+        #expand("outputs/consensus/{depth}/{intervals}/{sample}.fasta",depth=depth_range,sample=samples,intervals=intervals),
+        #expand("outputs/coverage/{depth}/{intervals}/{sample}.cov", depth=depth_range, sample=samples, intervals=intervals),
+        expand("outputs/coverage/{intervals}/{sample}.cov", sample=samples,intervals=intervals),
+        #expand("outputs/insert_sizes/{intervals}/{sample}.insert_sizes",sample=samples,intervals=intervals),
+        expand("outputs/consensus/{intervals}/all_{depth}.fasta", depth=depth_range, intervals=intervals),
+        #expand("outputs/abundances/{sample}.bracken",sample=samples),
+        #"{SCRIPTS_DIR}/quick_align.sh '{params.rg}' {SARS_REF} {input.read_one} {input.read_two} {output} {log}" 
+        expand("outputs/consensus/bams/{intervals}/{sample}/{depth}.bam",intervals=intervals,sample=samples, depth=depth_range),
+        expand("outputs/depleted_fastqs/human/{sample}.R1.fastq.gz",sample=samples),
+       # bai="outputs/consensus/bams/{intervals}/{sample}/{depth}.bam.bai"
+        #expand("outputs/igv-report/{intervals}/{sample}.html", intervals=intervals, sample=samples),
+        # TODO: Reimplement the mapping from 
+        #
+        # TODO: Combinne all sample information we can gather from the sequencing into a single file. 
+        "outputs/amplicon_qc/amplicon_df.txt",
+        "outputs/amplicon_qc/amplicon_merged_df.txt",
+        "outputs/final/abundances.bracken",
+        "outputs/pangolin/lineages.csv",
+        #"outputs/final/qc_report.tsv",
+        "outputs/qc_report/all.qc",
+        directory(expand("outputs/final/merged/coverage_plots/{intervals}/",intervals=intervals)),
+        #""outputs/final/filtered/metadata.csv",
+        "outputs/final/merged/qc_report.tsv",
+        expand("outputs/bcftools_vcfs/merged/filt/{intervals}/all.vcf.gz",intervals=intervals),
+        "outputs/final/merged/annovar/all_filtered_annovar_table.txt",
+        "outputs/final/merged/quasi_species/all.vcf.gz"
+  #     "outputs/consensus/merged/sars2/all_5.tsv",
+#
+import shutil
+import numpy as np
+rule generate_final_dataset_package:
+    input:
+        qc_report_in="outputs/qc_report/all.qc",
+        pangolin_out="outputs/pangolin/lineages.csv",
+        input_consensus = expand("outputs/consensus/merged/{intervals}/all_{depth}.fasta", depth=MIN_DEPTH, intervals=intervals),
+        read_one = expand("outputs/filtered_fastqs/{intervals}/{sample}.R1.fastq.gz",intervals=intervals,sample=samples),
+        read_two = expand("outputs/filtered_fastqs/{intervals}/{sample}.R2.fastq.gz",intervals=intervals, sample=samples),
+        depleted_read_one = expand("outputs/depleted_fastqs/human/{sample}.R1.fastq.gz",sample=samples),
+        depleted_read_two = expand("outputs/depleted_fastqs/human/{sample}.R2.fastq.gz", sample=samples),
+        merged_vcf = "outputs/bcftools_vcfs/merged/filt/sars2/all.vcf.gz"
+    output:
+        merged_csv=report("outputs/final/merged/qc_report.tsv",category="qc_reports/final",caption=workflow.basedir + "/report/coverage_plots.rst"),
+        merged_csv_unfiltered=report("outputs/qc_report/merged/qc_report.tsv",category="qc_reports/merged",caption=workflow.basedir + "/report/coverage_plots.rst"),
+        csv_per_library=report("outputs/qc_report/qc_report.tsv",category="qc_reports/per_library",caption=workflow.basedir + "/report/coverage_plots.rst"),
+        #report(directory("outputs/final/merged/coverage_plots/{intervals}/"),patterns=["{sample}.png"],category="coverage_plots/final_coverage_plots",caption=workflow.basedir+ "/report/coverage_plots.rst")
+        filtered_fastqs=directory("outputs/final/merged/filtered_fastqs") ,
+        depeleted_fastqs=directory("outputs/final/merged/host_depleted_fastqs"),
+        consensus_fasta="outputs/final/merged/all.fasta",
+        final_vcf="outputs/final/merged/all.vcf.gz"
+    run:
+        # Let's create the QC table for the merged libraries.
+        #
+        ## Temaplate for the pandas.
+        #
+        #
+        df = pd.DataFrame(columns=metadata.columns)
+        df = df.drop(columns=["sample","strain","lib_name","fastq_one","fastq_two","run_name"])
+        all_qc = pd.read_csv(input.qc_report_in,sep=" ")
+
+        md_m= metadata.merge(all_qc,left_on="sample",right_on="sample")
+        #pango_in = pd.read_csv(input.pangolin_out,sep=",")
+        #md_m = md_m.merge(pango_in,left_on="strain",right_on="taxon",how="outer")
+        md_m = md_m.fillna(value="NA")
+        md_m.to_csv(output.csv_per_library,sep="\t", index=False)  
+        row_tuples = []
+        coverage_tuples =[]
+        library_tuples = []
+        for key, samples in mapped_uid.items():
+            qc_rows = all_qc[all_qc["sample"].isin(samples)]
+            tmp_row = {}
+            qc_rows = qc_rows[["mapped_human","mapped_rrna","mapped_sars2","unmapped","total_read_count"]].apply(np.sum,axis=0)
+            metadata[metadata["sample"].isin(samples)]
+            row_tuples.append((key, qc_rows["mapped_human"],qc_rows["mapped_rrna"], qc_rows["mapped_sars2"], qc_rows["unmapped"],qc_rows["total_read_count"] )) 
+                ### now we load in everything we need to calculate i.e mapping stat ##
+            with open("outputs/consensus/merged/sars2/5/{sample}.cov".format(sample=key)) as in_f:
+                for line in in_f:
+                    coverage_tuples.append((key, float(line), sample_names_hash[key][0],sample_names_hash[key][1]))
+            cov_in = pd.read_csv("outputs/coverage/merged/sars2/{sample}.cov".format(sample=key),sep="\t",header=None) 
+
+            mean_coverage = np.mean(cov_in[2])
+            tmp_metadata=metadata[metadata["sample"].isin(samples)]
+            ### TODO: add to finnal column as josh requested
+            lib_names =",".join(tmp_metadata["lib_name"]) 
+            fastq_one =",".join(tmp_metadata["fastq_one"]) 
+            fastq_two = ",".join(tmp_metadata["fastq_two"])
+            samples_str = [str(sample) for sample in samples]
+            samples_out = ",".join(samples_str)
+            library_tuples.append((key, lib_names, fastq_one, fastq_two, samples_out ,mean_coverage))
+        coverage_5x_df = pd.DataFrame(coverage_tuples, columns=["merged_id","coverage_5x","read_group_name","uid_lib"])
+        library_df = pd.DataFrame(library_tuples, columns=["merged_id","lib_names","fastqs_one","fastqs_two","library_id_internal","coverage_mean"])
+        out_df = pd.DataFrame(row_tuples, columns=["merged_id","mapped_human","mapped_rrna","mapped_sars2","unmapped","total_read_count"])
+        out_df["sars2_percent"] = out_df["mapped_sars2"]/(out_df["mapped_human"] + out_df["mapped_rrna"] + out_df["mapped_sars2"]) * 100
+        pango_in = pd.read_csv(input.pangolin_out, sep=",")
+        out_df = out_df.merge(coverage_5x_df, left_on="merged_id", right_on="merged_id", how="outer")
+        out_df = out_df.merge(library_df, left_on="merged_id", right_on="merged_id", how="outer")
+        out_df = out_df.merge(pango_in, left_on="read_group_name", right_on="taxon", how="outer")
+        ## Now merged with metadata .... ### 
+        out_df = out_df.merge(metadata,left_on="uid_lib",right_on="id_library_type")
+        out_df = out_df.drop_duplicates(subset=["uid_lib"])
+        out_df =  out_df.drop(columns=["sample","strain","lib_name","fastq_one","fastq_two","run_name"])
+        out_df=out_df.fillna(value="NA")
+        sample_name_fasta_vcf = [key.replace("_","-") for key in mapped_uid.keys() ]
+        out_df["sample_name_fasta"] = sample_name_fasta_vcf
+        out_df.to_csv(output.merged_csv_unfiltered, sep="\t",index=False)
+        # Drop irrelvente collum
+        shell("touch {output.consensus_fasta}")
+        shell("touch {output.merged_csv}")
+        shell("touch {output.final_vcf}")
+        if os.path.getsize(input.input_consensus[0]) != 0:
+
+            shutil.copy(input.input_consensus[0], output.consensus_fasta)
+
+            os.makedirs("outputs/final/merged/filtered_fastqs/",exist_ok=True)
+            os.makedirs("outputs/final/merged/host_depleted_fastqs/",exist_ok=True)
+            in_fasta = pyfasta.Fasta(input.input_consensus[0])
+            kept_ids = [] 
+            for key in in_fasta.keys():
+                rows = metadata["sample"][metadata["id_library_type"].isin(out_df["uid_lib"][out_df["read_group_name"]  == key])]
+                merged_id = str(out_df["merged_id"][out_df["read_group_name"]==key]).split()[1]
+                kept_ids.append(merged_id)
+            with open("tmp_sample_list.txt","w") as out_f: 
+                for sample in kept_ids:
+                    out_f.write(sample.replace("_","-")+ "\n")
+            shell("bcftools view -S tmp_sample_list.txt {input.merged_vcf} | bgzip -c > {output.final_vcf} && tabix -p vcf {output.final_vcf}")
+            os.remove("tmp_sample_list.txt")
+            for key in in_fasta.keys():
+                rows = metadata["sample"][metadata["id_library_type"].isin(out_df["uid_lib"][out_df["read_group_name"]  == key])]
+                merged_id = str(out_df["merged_id"][out_df["read_group_name"]==key]).split()[1]
+                for row in rows:
+                    shell("cat outputs/filtered_fastqs/sars2/{sample}.R1.fastq.gz >> outputs/final/merged/filtered_fastqs/{key}.R1.fastq.gz".format(sample=row,key=merged_id))
+                    shell("cat outputs/filtered_fastqs/sars2/{sample}.R1.fastq.gz >> outputs/final/merged/filtered_fastqs/{key}.R2.fastq.gz".format(sample=row,key=merged_id))
+                    shell("cat outputs/depleted_fastqs/human/{sample}.R1.fastq.gz >> outputs/final/merged/host_depleted_fastqs/{key}.R1.fastq.gz".format(sample=row,key=merged_id))
+                    shell("cat outputs/depleted_fastqs/human/{sample}.R1.fastq.gz >> outputs/final/merged/host_depleted_fastqs/{key}.R2.fastq.gz".format(sample=row,key=merged_id))
+            
+            out_df = out_df[out_df["merged_id"].isin(kept_ids)] 
+            out_df.to_csv(output.merged_csv, sep="\t",index=False)
+
+        else:
+           print("No libraries passed QC")
+#
+
+
+
+
+rule generate_coverage_plot_merged:
+    """
+        #TODO: rename rule
+        Use bedtools to get depth per bp.
+    
+    """
+    resources:
+        mem_mb=16000,
+        walltime=43200
+    shadow: "minimal"
+    group: "ag"
+    input:
+        bam="outputs/md/merged/{intervals}/{sample}.bam"
+    output:
+        "outputs/coverage/merged/{intervals}/{sample}.cov"
+    shell:
+        "bedtools genomecov -ibam {input.bam} -d > {output}"
+
+rule make_coverage_plot_merged:
+    """
+        Create coverage plots 
+    """
+    #report("outputs/coverage/coverage_plots/{intervals}/{sample}.png", caption="report/coverage_plots.rst", category="coverage_plots")
+    group: "ag"
+    conda: workflow.basedir + "/envs/r-covid.yaml"
+    input:    
+        "outputs/coverage/merged/{intervals}/{sample}.cov"
+    output:
+        report("outputs/coverage/merged/coverage_plots/{intervals}/{sample}.png", caption=workflow.basedir+ "/report/coverage_plots.rst", category="coverage_plots/merged_coverage_plots")
+#        report("test.png", caption="report/coverage_plots.rst", category="coverage_plots")
+    shell:
+        "{SCRIPTS_DIR}/make_coverage_plots.R {input} {output} {wildcards.sample}_{wildcards.intervals}"
+   
+rule make_coverage_plots_final:
+    input:
+         coverage_plots_in = expand("outputs/coverage/merged/coverage_plots/{intervals}/{sample}.png",intervals=intervals, sample=mapped_uid.keys()),
+         complete="outputs/final/merged/qc_report.tsv"
+    output:
+         report(directory("outputs/final/merged/coverage_plots/{intervals}/"),patterns=["{sample}.png"],category="coverage_plots/final_coverage_plots",caption=workflow.basedir+ "/report/coverage_plots.rst")
+    run:
+        in_meta = pd.read_csv(input.complete,sep="\t")
+        for coverage_plot in input.coverage_plots_in:
+            base =  os.path.basename(coverage_plot).split(".png")[0]
+            print(in_meta["merged_id"].isin([base]).any(axis=None))
+            if(in_meta["merged_id"].isin([base]).any(axis=None)):
+                shutil.copy(coverage_plot,output[0])
+
+#rule generate_filtered_data:
+#    input:
+#        input_consensus = expand("outputs/consensus/{intervals}/all_{depth}.fasta", depth=MIN_DEPTH, intervals=intervals),
+#        read_one = expand("outputs/filtered_fastqs/{intervals}/{sample}.R1.fastq.gz",intervals=intervals,sample=samples),
+#        read_two = expand("outputs/filtered_fastqs/{intervals}/{sample}.R2.fastq.gz",intervals=intervals, sample=samples),
+#        qc_report_in = "outputs/final/qc_report.tsv" 
+#    output:
+#        complete=report("outputs/final/filtered/metadata.csv",
+#        out_dir=directory("outputs/final/filtered/filtered_fastqs/")
+#    run:
+#        if os.path.getsize(input.input_consensus[0]) != 0:
+#            in_fasta = pyfasta.Fasta(input.input_consensus[0])
+#            genomes_passed_filter = in_fasta.keys()
+#            # Replace the slashes
+#            os.makedirs(output.out_dir,exist_ok=True)
+#            qc_report_in = pd.read_csv(input.qc_report_in, sep="\t")
+#            out_names = []
+#            for genome in genomes_passed_filter:
+#                genome_name="-".join(genome.split("/"))
+#                out_names.append(genome_name)
+#                number = int(genome_name.split("-")[3])
+#                for read_one, read_two in zip(input.read_one, input.read_two):
+#                    read_one_base = os.path.basename(read_one).split(".")[0]
+#                    if read_one_base == genome_name:
+#                        shutil.copy(read_one, os.path.join(output.out_dir,os.path.basename(read_one)))
+#                        shutil.copy(read_two, os.path.join(output.out_dir,os.path.basename(read_two)))
+#            subset = qc_report_in[qc_report_in["sample"].isin(out_names)]
+#            ### Add pangolin clades. 
+#            subset.to_csv(output.complete,index=False, sep="\t")
+#        else:
+#            print("No libraries passed QC")
+#            shell("touch {output.complete}")
+#
+
+include: "rules/align.smk"
+include: "rules/qc_metrics.smk"
+include: "rules/variant_calling.smk"
+include: "rules/phylogenetics.smk"

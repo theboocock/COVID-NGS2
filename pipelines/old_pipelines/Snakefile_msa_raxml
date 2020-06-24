@@ -1,0 +1,37 @@
+configfile:  "/media/theboocock/data/Dropbox/COVID19/ngs/pipelines/defaults.json"
+
+import configparser
+import pyfasta
+import os
+
+
+fasta_in = pyfasta.Fasta(config["fasta_in"])
+samples = list(public_gis.keys())
+sample_mapping = { (x.replace("/","_")):x for x in samples }
+sample_lists = list(sample_mapping.keys())
+
+CWD=os.getcwd()
+
+def get_original_id(wildcards):
+    return(sample_mapping[wildcards.sample])
+
+rule all:
+    input:
+        #"outputs/vcf/all.vcf"
+        "outputs/final/all.vcf.gz"
+        #"outputs/genomicsdb/db_{intervals}/complete.txt"
+        #expand("outputs/{sample}.bam", sample=samples)
+
+
+rule msa_fasta:
+    input:
+       "{fasta_in}"
+    output:
+        "outputs/msa/aligned_all.fasta"
+    log:
+    run:
+        ## Run loads of stuff in R.
+
+
+rule raxml_basic_tree:
+    

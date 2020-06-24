@@ -1,0 +1,137 @@
+#https://snakemake.bitbucket.io/snakemake-tutorial.html
+#@author James Boocock
+#@date March 31, 2020
+
+## We should change this input
+configfile:  workflow.current_basedir + "/defaults.yaml" 
+CONFIGFILE= workflow.current_basedir + "/defaults.yaml" 
+
+wildcard_constraints: 
+    sample="(?!merged)([a-z0-9A-Z-_]+)",
+    intervals="(?!merged)([a-z0-9A-Z-_]+)",
+    depth="(?!merged)([a-z0-9A-Z-_]+)",
+    uid_lib="(?!merged)([a-z0-9A-Z-_]+)"
+import configparser
+import pyfasta
+SOFTWARE_PATH=config["PATHS"]["SOFTWARE_FOLDER"]
+PICARD_PATH=SOFTWARE_PATH + config["PATHS"]["PICARD_PATH"]
+GATK_PATH=SOFTWARE_PATH + config["PATHS"]["GATK_PATH"]
+SCRIPTS_DIR=config["PATHS"]["SCRIPTS_DIR"]
+REFERENCE=config["PATHS"]["REFERENCE"]
+SARS_REF=config["PATHS"]["SARS_REF"]
+MAPQ_FILT=config["PARAMS"]["MAPQ_FILT"]
+GISAID_FASTA=config["PATHS"]["GISAID_FASTA"]
+GISAID_METADATA=config["PATHS"]["GISAID_METADATA"]
+
+OLIGO_POOL_BED=config["PATHS"]["OPOOL_FILE"]
+ARCTIC_FILE=config["PATHS"]["ARCTIC_FILE"]
+
+TAXON_IN=config["PATHS"]["TAXON_ID"]
+
+HAPLOTYPE_CORES=config["PARAMS"]["HAPLOTYPE_CORES"]
+MIN_DEPTH=config["PARAMS"]["MIN_DEPTH"]
+MIN_QUAL=config["PARAMS"]["MIN_QUAL"]
+FRAC_STRAND=config["PARAMS"]["FRAC_STRAND"]
+#DEPTH_ARRAY=range(MIN_DEPTH,MIN_DEPTH*5,MIN_DEPTH)
+
+input_fasta = pyfasta.Fasta(REFERENCE)
+intervals=[config["PARAMS"]["SARS_GENOME_NAME"]]
+
+TRIMMOMATIC_ADAPTERS=config["PATHS"]["TRIMMOMATIC_ADAPTERS"]
+TRIMMOMATIC_PATH=config["PATHS"]["TRIMMOMATIC_PATH"]
+
+BRACKEN_PATH=config["PATHS"]["BRACKEN_PATH"]
+
+#intervals=list(input_fasta.keys())
+#intervals = [interval.strip().replace(" ","_").replace(",","") for interval in intervals]
+
+include: "rules/utils.smk"
+
+depth_range = [5]
+min_cov = 0.9
+
+taxon_dict = read_taxid(TAXON_IN)
+metadata=fastq_match(config)
+samples=metadata["sample"]
+rg_name=metadata["strain"]
+mapped_uid, sample_names_hash, mapped_uids_read_one, mapped_uids_read_two = uid_library_to_sample_name_and_readgroup()
+#with open("sample_mapping.txt","w") as out_f:
+#    for key, items in mapped_uid.items():
+#        print(key)
+#        print(items)
+#        out_f.write(str(key) + " " + " ".join([str(o) for o in items]) + "\n")
+
+print(len(mapped_uid.keys()))
+
+rule all:
+    input:
+        expand("outputs/md/merged/{intervals}/{uid_lib}.bam",intervals=intervals, uid_lib=mapped_uid.keys()),
+        expand("outputs/consensus/merged/{intervals}/all_{depth}.fasta", depth=depth_range, intervals=intervals),
+        expand("outputs/abundances/merged/{sample}.bracken", sample=mapped_uid.keys()), 
+
+       # TODO check if it works#
+      #"test.png",
+        expand("outputs/coverage/coverage_plots/{intervals}/{sample}.png", intervals=intervals, sample=samples), 
+        expand("outputs/kraken_bams/{intervals}/{sample}.kraken.bam",intervals=intervals,sample=samples),
+        #expand("outputs/kraken_bams/{intervals}/{sample}.kraken.bam",sample=samples,intervals=intervals),
+        #expand("outputs/vcfs_filt/{intervals}/all.filt.vcf.gz",intervals=intervals),
+        #expand("outputs/consensus/{depth}/{intervals}/{sample}.fasta",depth=depth_range,sample=samples,intervals=intervals),
+        #expand("outputs/coverage/{depth}/{intervals}/{sample}.cov", depth=depth_range, sample=samples, intervals=intervals),
+        expand("outputs/coverage/{intervals}/{sample}.cov", sample=samples,intervals=intervals),
+        #expand("outputs/insert_sizes/{intervals}/{sample}.insert_sizes",sample=samples,intervals=intervals),
+        expand("outputs/consensus/{intervals}/all_{depth}.fasta", depth=depth_range, intervals=intervals),
+        expand("outputs/ncov/{intervals}/all_{MIN_DEPTH}.fasta",MIN_DEPTH=MIN_DEPTH,intervals=intervals),
+        #expand("outputs/abundances/{sample}.bracken",sample=samples),
+        #"{SCRIPTS_DIR}/quick_align.sh '{params.rg}' {SARS_REF} {input.read_one} {input.read_two} {output} {log}" 
+        expand("outputs/consensus/bams/{intervals}/{sample}/{depth}.bam",intervals=intervals,sample=samples, depth=depth_range),
+        expand("outputs/depleted_fastqs/human/{sample}.R1.fastq.gz",sample=samples),
+       # bai="outputs/consensus/bams/{intervals}/{sample}/{depth}.bam.bai"
+        #expand("outputs/igv-report/{intervals}/{sample}.html", intervals=intervals, sample=samples),
+        # TODO: Reimplement the mapping from 
+        #
+        # TODO: Combinne all sample information we can gather from the sequencing into a single file. 
+        "outputs/amplicon_qc/amplicon_df.txt",
+        "outputs/final/abundances.bracken",
+        "outputs/final/qc_report.tsv",
+        "outputs/qc_report/all.qc",
+        "outputs/final/filtered/metadata.csv",
+#
+import shutil
+rule generate_filtered_data:
+    input:
+        input_consensus = expand("outputs/consensus/{intervals}/all_{depth}.fasta", depth=5, intervals=intervals),
+        read_one = expand("outputs/filtered_fastqs/{intervals}/{sample}.R1.fastq.gz",intervals=intervals,sample=samples),
+        read_two = expand("outputs/filtered_fastqs/{intervals}/{sample}.R2.fastq.gz",intervals=intervals, sample=samples),
+        qc_report_in = "outputs/final/qc_report.tsv" ,
+    output:
+        complete="outputs/final/filtered/metadata.csv",
+        out_dir=directory("outputs/final/filtered/filtered_fastqs/"),
+    run:
+        if os.path.getsize(input.input_consensus[0]) != 0:
+            in_fasta = pyfasta.Fasta(input.input_consensus[0])
+            genomes_passed_filter = in_fasta.keys()
+            # Replace the slashes
+            os.makedirs(output.out_dir,exist_ok=True)
+            qc_report_in = pd.read_csv(input.qc_report_in, sep="\t")
+            out_names = []
+            for genome in genomes_passed_filter:
+                genome_name="-".join(genome.split("/"))
+                out_names.append(genome_name)
+                number = int(genome_name.split("-")[3])
+                for read_one, read_two in zip(input.read_one, input.read_two):
+                    read_one_base = os.path.basename(read_one).split(".")[0]
+                    if read_one_base == genome_name:
+                        shutil.copy(read_one, os.path.join(output.out_dir,os.path.basename(read_one)))
+                        shutil.copy(read_two, os.path.join(output.out_dir,os.path.basename(read_two)))
+            subset = qc_report_in[qc_report_in["sample"].isin(out_names)]
+            ### Add pangolin clades. 
+            subset.to_csv(output.complete,index=False, sep="\t")
+        else:
+            print("No libraries passed QC")
+            shell("touch {output.complete}")
+
+
+include: "rules/align.smk"
+include: "rules/qc_metrics.smk"
+include: "rules/variant_calling.smk"
+include: "rules/phylogenetics.smk"

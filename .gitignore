@@ -1,0 +1,7 @@
+data/*
+test/*
+software/*
+ref/*
+pipelines/defaults.yaml
+scripts/in_silico_digest/human/*
+scripts/in_silico_digest/sar/*

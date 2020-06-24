@@ -1,0 +1,46 @@
+# 
+# STAR alignment and variant calling
+
+configfile: workflow.current_basedir + "/defaults.yaml"
+CONFIGFILE= workflow.current_basedir + "/defaults.yaml"
+include: "rules/utils.smk"
+
+SOFTWARE_PATH=config["PATHS"]["SOFTWARE_FOLDER"]
+PICARD_PATH=SOFTWARE_PATH + config["PATHS"]["PICARD_PATH"]
+GATK_PATH=SOFTWARE_PATH + config["PATHS"]["GATK_PATH"]
+SCRIPTS_DIR=config["PATHS"]["SCRIPTS_DIR"]
+REFERENCE=config["PATHS"]["REFERENCE"]
+SARS_REF=config["PATHS"]["SARS_REF"]
+STAR_REFERENCE=config["PATHS"]["STAR_REFERENCE"]
+MAPQ_FILT=config["PARAMS"]["MAPQ_FILT"]
+
+
+
+
+HAPLOTYPE_CORES=config["PARAMS"]["HAPLOTYPE_CORES"]
+MIN_DEPTH=config["PARAMS"]["MIN_DEPTH"]
+MIN_QUAL=config["PARAMS"]["MIN_QUAL"]
+FRAC_STRAND=config["PARAMS"]["FRAC_STRAND"]
+DEPTH_ARRAY=range(MIN_DEPTH,MIN_DEPTH*5,MIN_DEPTH)
+import pyfasta
+input_fasta = pyfasta.Fasta(REFERENCE)
+intervals=list(input_fasta.keys())
+### 
+#
+intervals = ["chr"+ str(i) for i in range(1,23)] + ["sars2"]
+
+samples, fastq_input_pairs = fastq_match(config)
+
+
+### VALID INTERVALS"
+print(samples)
+print(intervals)
+
+rule all:
+    input:
+        expand("outputs/vcfs_filt/all_{intervals}.filt.vcf.gz",intervals=intervals)
+        #"outputs/vcf.all"
+
+include: "rules/star_align.smk"
+include: "rules/variant_calling_star.smk"
+

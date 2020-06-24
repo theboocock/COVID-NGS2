@@ -1,0 +1,95 @@
+#https://snakemake.bitbucket.io/snakemake-tutorial.html
+#@author James Boocock
+#@date March 31, 2020
+
+## We should change this input
+configfile:  workflow.current_basedir + "/defaults.yaml" 
+CONFIGFILE= workflow.current_basedir + "/defaults.yaml" 
+ 
+
+import configparser
+import pyfasta
+SOFTWARE_PATH=config["PATHS"]["SOFTWARE_FOLDER"]
+PICARD_PATH=SOFTWARE_PATH + config["PATHS"]["PICARD_PATH"]
+GATK_PATH=SOFTWARE_PATH + config["PATHS"]["GATK_PATH"]
+SCRIPTS_DIR=config["PATHS"]["SCRIPTS_DIR"]
+REFERENCE=config["PATHS"]["REFERENCE"]
+SARS_REF=config["PATHS"]["SARS_REF"]
+MAPQ_FILT=config["PARAMS"]["MAPQ_FILT"]
+
+HAPLOTYPE_CORES=config["PARAMS"]["HAPLOTYPE_CORES"]
+MIN_DEPTH=config["PARAMS"]["MIN_DEPTH"]
+MIN_QUAL=config["PARAMS"]["MIN_QUAL"]
+FRAC_STRAND=config["PARAMS"]["FRAC_STRAND"]
+DEPTH_ARRAY=range(MIN_DEPTH,MIN_DEPTH*5,MIN_DEPTH)
+
+input_fasta = pyfasta.Fasta(REFERENCE)
+intervals=[config["PARAMS"]["SARS_GENOME_NAME"]]
+
+TRIMMOMATIC_ADAPTERS=config["PATHS"]["TRIMMOMATIC_ADAPTERS"]
+TRIMMOMATIC_PATH=config["PATHS"]["TRIMMOMATIC_PATH"]
+
+
+#intervals=list(input_fasta.keys())
+#intervals = [interval.strip().replace(" ","_").replace(",","") for interval in intervals]
+
+fastq_input_pairs = {}
+sample_names = {}
+try:
+    config["sample_list"] 
+except KeyError:
+    sys.stderr.write("Please specifiy the sample input file --sample in on the command line")
+    sys.exit(1)
+samples=[]
+input_folder=config["in_folder"]
+with open(config["sample_list"]) as in_samples:
+    for sample_row in in_samples:
+        sample = sample_row.split()[0]
+        samples.append(sample)
+        r1 = os.path.join(input_folder, sample_row.split()[1])
+        r2 = os.path.join(input_foldersample_row.split()[2]
+        fastq_input_pairs[sample] = (r1,r2)
+    #TODO: Parse sample names so that they can be joint called together.
+    #sample_names
+print(samples)
+
+rule all:
+    input:
+        expand("outputs/vcfs_filt/all_{intervals}.filt.vcf.gz",intervals=intervals),
+        expand("outputs/consensus/{sample}.{intervals}.fasta",sample=samples,intervals=intervals),
+        #expand("outputs/vcfs_filt/all_{intervals}.filt.vcf.gz",sample=samples,intervals=intervals),
+        expand("outputs/mapping_stats/{sample}.mapstat",sample=samples),
+        expand("outputs/coverage/{sample}.{intervals}.cov", sample=samples, intervals=intervals),
+        #expand("outputs/coverage/{sample}.cov", sample=samples),
+        expand("outputs/insert_sizes/{sample}.{intervals}.insert_sizes",sample=samples,intervals=intervals),
+        "outputs/consensus/all.fasta",
+        "outputs/qc_report/all.qc",
+        "outputs/pangolin/lineages.csv"
+#        expand("outputs/kraken_bams/{sample}.kraken.bam",sample=samples)
+        #"outputs/genomicsdb/db_{intervals}/complete.txt"
+        #expand("outputs/{sample}.bam", sample=samples)
+## Other snakemake rules ##
+#
+
+include: "rules/align.smk"
+include: "rules/qc_metrics.smk"
+include: "rules/variant_calling.smk"
+
+rule run_pangolin:
+    shadow: "shallow"
+    input:
+        "outputs/consensus/all.fasta"
+    output:
+        "outputs/pangolin/lineages.csv"
+    run:
+        shell("pangolin {input}")
+        os.rename("lineage_report.csv", output[0]) 
+
+rule align_genomes_and_generate_tree:
+    input:
+        "outputs/consensus/all.fasta"
+    output:
+        "outputs/trees/all.tree"
+    shell:
+        "{SCRIPTS_DIR}/generate_consensus_tree.py -i {input} -o {output} "
+

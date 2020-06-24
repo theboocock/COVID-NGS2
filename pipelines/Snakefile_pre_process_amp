@@ -1,0 +1,49 @@
+
+
+configfile: workflow.current_basedir + "/defaults.yaml"
+
+
+wildcard_constraints: 
+	sample="[^/]+"
+
+SCRIPTS_DIR=config["PATHS"]["SCRIPTS_DIR"]
+OLIGO_POOL_BED=config["PATHS"]["OPOOL_FILE"]
+
+include: "rules/utils.smk"
+
+depth_range = [2,3,4,5,10]
+min_cov = 0.9
+TAXON_IN=config["PATHS"]["TAXON_ID"]
+
+MAPQ_FILT=config["PARAMS"]["MAPQ_FILT"]
+intervals = [config["PARAMS"]["SARS_GENOME_NAME"]]
+
+taxon_dict = read_taxid(TAXON_IN)
+metadata=fastq_match(config)
+samples=metadata["sample"]
+rg_name=metadata["strain"]
+
+rule all:
+    input:
+        expand("outputs/fastqs/{sample}.R1.fastq.gz",sample=samples) 
+rule trim_reads:
+    input:
+        read_one=get_fq1,
+        read_two=get_fq2
+    output:
+        out_fastq_one="outputs/fastqs/{sample}.R1.fastq.gz",
+        out_fastq_two="outputs/fastqs/{sample}.R2.fastq.gz"
+    shell:
+        "{SCRIPTS_DIR}/amplicon/custom_amplicon_parser.R {input.read_one} {input.read_two} {output.out_fastq_one} {output.out_fastq_two} {OLIGO_POOL_BED}"
+
+
+rule create_amplicon_depth_df:
+    input:
+        bam="outputs/md/sars2/{sample}.sorted.md.bam",
+        bai="outputs/md/sars2/{sample}.sorted.md.bam.bai"
+    output:
+        "results_amplicon/amplicon_depth/{sample}.txt"
+    shell:
+        "{SCRIPTS_DIR}/amplicon/per_amplicon_depth.py -b {input.bam} -o {output} -q {MAPQ_FILT} -p {OLIGO_POOL_BED}"
+
+#include "rules/align.smk"

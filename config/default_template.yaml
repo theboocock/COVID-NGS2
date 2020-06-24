@@ -1,0 +1,38 @@
+PATHS:
+    SOFTWARE_FOLDER: !BASE_PIPELINE!/software/
+    SCRIPTS_DIR: !BASE_PIPELINE!/pipelines/scripts/
+    REFERENCE: !BASE_PIPELINE!/ref/phi_human_cov.fasta
+    SARS_REF: !BASE_PIPELINE!/ref/sars-cov-2.fasta
+    PICARD_PATH: picard/picard.jar
+    GATK_PATH: gatk-4.1.6.0/gatk
+    RRNA_HG38: !BASE_PIPELINE!/ref/HG38_rrna.bed
+    GENOME_HG38: !BASE_PIPELINE!/ref/HG38_no_rrna.bed
+    CLADE_FASTA:  !BASE_PIPELINE!/ref/clades.fasta
+    TRIMMOMATIC_PATH:  !BASE_PIPELINE!/software/Trimmomatic-0.36/trimmomatic-0.36.jar
+    TRIMMOMATIC_ADAPTERS:  !BASE_PIPELINE!/software/Trimmomatic-0.36/adapters/NexteraPE-PE.fa
+    STAR_REFERENCE: !BASE_PIPELINE!/ref/human_sars2_phi/
+    KRAKEN2_PATH: !BASE_PIPELINE!//software/kraken2/kraken2
+    BRACKEN_PATH: !BASE_PIPELINE!//software/Bracken-2.5/bracken 
+    TAXON_ID: !BASE_PIPELINE!/ref/kraken/taxid_to_name.txt
+    KRAKEN2_DB: !BASE_PIPELINE!/ref/kraken/minikraken_8GB_20200312/
+    GISAID_FASTA:  !BASE_PIPELINE!/ref/gisaid/gisaid.fasta
+    GISAID_METADATA: !BASE_PIPELINE!/ref/gisaid/gisaid.tsv
+    OPOOL_FILE: !BASE_PIPELINE!/ref/amplicon/COVID_384rtPrimers.srt.bed
+    ARCTIC_FILE: !BASE_PIPELINE!/ref/amplicon/nCoV-2019.tsv
+    BCL2FASTQ: !BASE_PIPELINE!/software/bcl2fastq/bcl2fastq
+    SITES_TO_MASK: !BASE_PIPELINE!/ref/sites_to_mask/sites_to_mask.bed
+PARAMS:
+    HAPLOTYPE_CORES: 1
+    MIN_QUAL: 100
+    MIN_DEPTH: 5
+    FRAC_STRAND:  10
+    SARS_GENOME_NAME: sars2
+    MAPQ_FILT: 20
+
+
+
+
+
+
+
+

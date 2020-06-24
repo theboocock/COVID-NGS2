@@ -1,0 +1,26 @@
+#!/bin/bash
+#
+# @date May 9, 2020
+
+IN_FASTA=$1
+IN_METADATA=$2
+IN_GISAID_FASTA=$3
+IN_GISAID_METADATA=$4
+OUT_FASTA=$5
+OUT_METADATA=$6
+
+
+DIRECTORY=$(dirname $0)
+
+###
+### Creates the outputs
+###
+
+cat $IN_FASTA $IN_GISAID_FASTA > $OUT_FASTA
+#
+
+$DIRECTORY/combine_with_public_data.R $IN_METADATA $IN_GISAID_METADATA $OUT_METADATA
+
+#cat $IN_METADATA > $OUT_METADATA
+#tail -n +2 $IN_GISAID_METADATA >> $OUT_METADATA
+

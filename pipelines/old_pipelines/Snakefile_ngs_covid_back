@@ -1,0 +1,137 @@
+#https://snakemake.bitbucket.io/snakemake-tutorial.html
+#@author James Boocock
+#@date March 31, 2020
+
+## We should change this input
+configfile:  workflow.current_basedir + "/defaults.yaml" 
+CONFIGFILE= workflow.current_basedir + "/defaults.yaml" 
+
+wildcard_constraints: 
+	sample="[^/]+",
+	intervals="[^/]+",
+	depth="[^/]+"
+import configparser
+import pyfasta
+SOFTWARE_PATH=config["PATHS"]["SOFTWARE_FOLDER"]
+PICARD_PATH=SOFTWARE_PATH + config["PATHS"]["PICARD_PATH"]
+GATK_PATH=SOFTWARE_PATH + config["PATHS"]["GATK_PATH"]
+SCRIPTS_DIR=config["PATHS"]["SCRIPTS_DIR"]
+REFERENCE=config["PATHS"]["REFERENCE"]
+SARS_REF=config["PATHS"]["SARS_REF"]
+MAPQ_FILT=config["PARAMS"]["MAPQ_FILT"]
+GISAID_FASTA=config["PATHS"]["GISAID_FASTA"]
+GISAID_METADATA=config["PATHS"]["GISAID_METADATA"]
+
+
+TAXON_IN=config["PATHS"]["TAXON_ID"]
+
+HAPLOTYPE_CORES=config["PARAMS"]["HAPLOTYPE_CORES"]
+MIN_DEPTH=config["PARAMS"]["MIN_DEPTH"]
+MIN_QUAL=config["PARAMS"]["MIN_QUAL"]
+FRAC_STRAND=config["PARAMS"]["FRAC_STRAND"]
+DEPTH_ARRAY=range(MIN_DEPTH,MIN_DEPTH*5,MIN_DEPTH)
+
+input_fasta = pyfasta.Fasta(REFERENCE)
+intervals=[config["PARAMS"]["SARS_GENOME_NAME"]]
+
+TRIMMOMATIC_ADAPTERS=config["PATHS"]["TRIMMOMATIC_ADAPTERS"]
+TRIMMOMATIC_PATH=config["PATHS"]["TRIMMOMATIC_PATH"]
+
+BRACKEN_PATH=config["PATHS"]["BRACKEN_PATH"]
+
+#intervals=list(input_fasta.keys())
+#intervals = [interval.strip().replace(" ","_").replace(",","") for interval in intervals]
+
+include: "rules/utils.smk"
+
+depth_range = [2,3,4,5,10]
+min_cov = 0.9
+
+taxon_dict = read_taxid(TAXON_IN)
+metadata=fastq_match(config)
+samples=metadata["sample"]
+rg_name=metadata["strain"]
+
+rule all:
+    input:
+        # TODO check if it works#
+        #"test.png",
+        expand("outputs/coverage/coverage_plots/{intervals}/{sample}.png", intervals=intervals, sample=samples), 
+        expand("outputs/kraken_bams/{intervals}/{sample}.kraken.bam",intervals=intervals,sample=samples),
+        #expand("outputs/kraken_bams/{intervals}/{sample}.kraken.bam",sample=samples,intervals=intervals),
+        #expand("outputs/vcfs_filt/{intervals}/all.filt.vcf.gz",intervals=intervals),
+        #expand("outputs/consensus/{depth}/{intervals}/{sample}.fasta",depth=depth_range,sample=samples,intervals=intervals),
+        #expand("outputs/coverage/{depth}/{intervals}/{sample}.cov", depth=depth_range, sample=samples, intervals=intervals),
+        expand("outputs/coverage/{intervals}/{sample}.cov", sample=samples,intervals=intervals),
+        #expand("outputs/insert_sizes/{intervals}/{sample}.insert_sizes",sample=samples,intervals=intervals),
+        expand("outputs/consensus/{intervals}/all_{depth}.fasta", depth=depth_range, intervals=intervals),
+        expand("outputs/ncov/{intervals}/all_{MIN_DEPTH}.fasta",MIN_DEPTH=MIN_DEPTH,intervals=intervals),
+        expand("outputs/abundances/{sample}.bracken",sample=samples),
+        #"{SCRIPTS_DIR}/quick_align.sh '{params.rg}' {SARS_REF} {input.read_one} {input.read_two} {output} {log}" 
+        expand("outputs/consensus/bams/{intervals}/{sample}/{depth}.bam",intervals=intervals,sample=samples, depth=depth_range),
+       # bai="outputs/consensus/bams/{intervals}/{sample}/{depth}.bam.bai"
+        expand("outputs/igv-report/{intervals}/{sample}.html", intervals=intervals, sample=samples),
+        # TODO: Reimplement the mapping from 
+        #
+        # TODO: Combinne all sample information we can gather from the sequencing into a single file. 
+        # 
+        "outputs/final/abundances.bracken",
+        "outputs/final/qc_report.tsv",
+        "outputs/qc_report/all.qc",
+        "outputs/complete.txt"
+        #"outputs/pangolin/lineages.csv"
+#        expand("outputs/kraken_bams/{sample}.kraken.bam",sample=samples)
+       #"outputs/genomicsdb/db_{intervals}/complete.txt"
+       #expand("outputs/{sample}.bam", sample=samples)
+# Other snakemake rules ##
+import shutil
+rule generate_filtered_data:
+    input:
+        input_consensus = expand("outputs/consensus/{intervals}/all_{depth}.fasta", depth=5, intervals=intervals),
+        read_one = expand("outputs/filtered_fastqs/{intervals}/{sample}.R1.fastq.gz",intervals=intervals,sample=samples),
+        read_two = expand("outputs/filtered_fastqs/{intervals}/{sample}.R2.fastq.gz",intervals=intervals, sample=samples),
+        qc_report_in = "outputs/final/qc_report.tsv" 
+    output:
+        complete="outputs/complete.txt",
+        amp=directory("outputs/final/filtered/filtered_fastqs/amp"),
+        neb=directory("outputs/final/filtered/filtered_fastqs/neb")
+    run:
+        in_fasta = pyfasta.Fasta(input.input_consensus[0])
+        genomes_passed_filter = in_fasta.keys()
+        # Replace the slashes
+        os.makedirs(output.neb,exist_ok=True)
+        os.makedirs(output.amp,exist_ok=True)
+        qc_report_in = pd.read_csv(input.qc_report_in, sep="\t")
+        amp_names = []
+        neb_names = []
+        for genome in genomes_passed_filter:
+            genome_name="-".join(genome.split("/"))
+            number = int(genome_name.split("-")[3])
+            amp = number > 150
+            for read_one, read_two in zip(input.read_one, input.read_two):
+                read_one_base = os.path.basename(read_one).split(".")[0]
+                if read_one_base == genome_name:
+                    if amp:
+                        amp_names.append(genome_name)
+                        shutil.copy(read_one, os.path.join(output.amp,os.path.basename(read_one)))
+                        shutil.copy(read_two, os.path.join(output.amp,os.path.basename(read_two)))
+                    else:
+                        neb_names.append(genome_name)
+                        shutil.copy(read_one, os.path.join(output.neb,os.path.basename(read_one)))
+                        shutil.copy(read_two, os.path.join(output.neb,os.path.basename(read_two)))
+        subset = qc_report_in[qc_report_in["sample"].isin(neb_names)]
+        subset.to_csv("outputs/final/filtered/neb.csv", index=False, sep="\t")
+        subset = qc_report_in[qc_report_in["sample"].isin(amp_names)]
+        subset.to_csv("outputs/final/filtered/amp.csv", index=False, sep="\t")
+        shell("touch {output.complete}")
+        # Number == ### 
+            #
+            #create the output directory for josh 
+        ### Get fastqs files and split the consensus file based on whether they are amplicon or not ###
+        ### >200 are amplicon the rest are not ###  
+
+
+include: "rules/align.smk"
+include: "rules/qc_metrics.smk"
+include: "rules/variant_calling.smk"
+include: "rules/phylogenetics.smk"
