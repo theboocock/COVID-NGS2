@@ -59,6 +59,14 @@ def get_sample_type(wildcards):
     sample_type = str(sample_type).split()[1]
     return(sample_type)
 
+def get_oligos_used(wildcards):
+    if "oligos_used" in metadata.columns:
+        oligo_used = metadata["oligos_used"][metadata["sample"] == int(wildcards.sample)]
+        oligo_used = str(oligo_used).split()[1]
+        return oligo_used 
+    else:
+        return "NA"
+
 def get_fq1(wildcards):
     out_fastq = metadata["fastq_one"][metadata["sample"] == int(wildcards.sample)]
     return out_fastq 

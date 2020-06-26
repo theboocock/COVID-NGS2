@@ -64,7 +64,7 @@ trimReadsAmp=function(    #read1
         q1=q1[w1>min.length.filter & w2>min.length.filter]
         cread2=cread2[w1>min.length.filter & w2>min.length.filter]
         q2=q2[w1>min.length.filter & w2>min.length.filter]
-
+    
         for(oname in names(oPool.primers)[1:length(oPool.primers)]){
 					r1.primer.N = length(oPool.primers[[oname]])
 					m1=which.isMatchingStartingAt(oPool.primers[[oname]], cread1, 
@@ -269,6 +269,8 @@ fastq_out_two = args[4]
 opool.primers = args[5]
 type = args[6]
 arctic.primers = args[7]
+all.primers = args[8]
+sample_list = args[9] 
 oPool.primers.table=read.delim(opool.primers, header=F, stringsAsFactors=F)
 oPool.primers=DNAStringSet(oPool.primers.table[,5])
 names(oPool.primers) = oPool.primers.table[,4]
@@ -276,10 +278,11 @@ names(oPool.primers) = oPool.primers.table[,4]
 #experiment name
 #clinic name
 #sequence name
-print(args)
-print(head(oPool.primers))
 # stuff starts happening here
 #loop through fastq files 
+primers = read.table(arctic.primers, header=T, sep="\t", stringsAsFactors=F)
+print(head(primers))
+primers = primers[grep('RIGHT', primers$name),]
 if (type == "arctic"){
 	primers = read.table(arctic.primers, header=T, sep="\t", stringsAsFactors=F)
 	primers = primers[grep('RIGHT', primers$name),]
@@ -310,7 +313,62 @@ if (type == "arctic"){
                     #DNAStringSet of RT primers
                     oPool.primers)
 
-}
+}else if (type == "amp_complicated"){
+    library(stringr)
+    x = str_split(sample_list,",")
+    x = as.numeric(x[[1]])
+    #print(x)
+    #oPool.primers.table = oPool.primers.table[which(oPool.primers.table[,3] %in% x),]
+    #print(nrow(oPool.primers.table))
+    #oPool.primers.table = oPool.primers.table[!duplicated(oPool.primers.table[,2]),]
+    #print(nrow(oPool.primers.table))
+    #oPool.primers = DNAStringSet(oPool.primers.table[,2])
+    #names(oPool.primers) = oPool.primers.table[,1]
+	
+    ### Send the arctic information through. 
+    # 2 is arctic, 1,3,4 are amplicon. 
+
+    if (any(c(1,3,4) %in% x)){
+        y  = x[x!=2]        
+        oPool.primers.table = read.delim(all.primers, header=F, sep="\t", stringsAsFactors=F)
+        oPool.primers.table = oPool.primers.table[which(oPool.primers.table[,3] %in% y),]
+        oPool.primers.table = oPool.primers.table[!duplicated(oPool.primers.table[,2]),]
+        oPool.primers = DNAStringSet(oPool.primers.table[,2])
+        names(oPool.primers) = oPool.primers.table[,1]
+        trimReadsAmp(#read1
+                       fastq_one,
+                        #read2
+                        fastq_two, 
+                        #trimmed read1
+                        fastq_out_one,
+                        #trimmed read 2
+                        fastq_out_two,
+                        #DNAStringSet of RT primers
+                        oPool.primers)
+    }
+    if (2 %in% x){
+        y  = x[x==2]        
+        oPool.primers.table = read.delim(all.primers, header=F, sep="\t", stringsAsFactors=F)
+        oPool.primers.table = oPool.primers.table[which(oPool.primers.table[,3] %in% y),]
+        oPool.primers.table = oPool.primers.table[!duplicated(oPool.primers.table[,2]),]
+        oPool.primers.arctic = DNAStringSet(oPool.primers.table[,2])
+        primers.arctic = data.frame(seq=oPool.primers.table[,2],name=oPool.primers.table[,1],length=sapply(oPool.primers.table[,2],nchar))
+        primers.arctic = split(primers.arctic,primers.arctic$name)
+        trimReadsArctic(#read1
+                       fastq_one,
+                        #read2
+                        fastq_two, 
+                        #trimmed read1
+                        fastq_out_one,
+                        #trimmed read 2
+                        fastq_out_two,
+                        #DNAStringSet of RT primers
+                        primers.arctic)
+    }
+    ## REMOVE DUPLICETASE
+    #print(oPool.primers.table)
+
+} 
 
 # following code will report a per-amplicon summary from the generated bam files above
 #library(rbamtools)

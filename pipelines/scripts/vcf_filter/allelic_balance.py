@@ -91,6 +91,7 @@ def vcf_input_filter(vcf_file,lower, upper, vcf_outfile):
                     out_f.write(":"+str(ratio))
                 else:
                     gt = sample["GT"] 
+                    # TODO: make sure to extract the relevant information from the reference
                     if gt[0] == None:
                         gt = "./."
                         ratio = "."

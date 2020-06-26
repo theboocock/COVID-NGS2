@@ -24,10 +24,6 @@ uids = sprintf("U%04i",as.numeric(uid))
 clin_in$ID = uids
 sample_type = args[4] 
 sample_sheet = args[5]
-if(!is.na(sample_sheet)){
-    print("Sample sheet found, skipping clinical inforamtion")
-
-}
 
 length_default = 29903
 host_default = "Human"
@@ -51,9 +47,18 @@ uid = str_extract(sample_id,"U[0-9]+")
 uid = str_replace_all(uid,"U","")
 uids = sprintf("U%04i",as.numeric(uid))
 df_meta$uid = uids
-print(dim(df_meta))
-print(tail(df_meta))
-print(tail(clin_in))
-df_merged = merge(df_meta,clin_in,by.x="uid",by.y="ID")
+df_merged = merge(df_meta,clin_in,by.x="uid",by.y="ID",all.x=TRUE)
 
+
+if(!is.na(sample_sheet)){
+    print("Sample sheet found, skipping clinical inforamtion")
+    ss_in = read.csv(sample_sheet, header=T)
+    lib_name = unlist(lapply(str_split(df_merged$lib_name,"_"), function(x){x[1]}))
+    df_merged$lib_name_short = lib_name
+    df_merged = merge(df_merged, ss_in, by.y=1,by.x="lib_name_short")
+    oligos_used = df_merged$oligos_used
+    oligos_used = unlist(lapply(str_split(oligos_used,"\\|"), function(x) { paste(x, collapse=",")}))
+    df_merged$uid = df_merged$uid.x
+    df_merged$oligos_used = oligos_used
+}
 write.table(df_merged, file=args[2], quote=F, row.names=F, sep="\t") 

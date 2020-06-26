@@ -108,7 +108,7 @@ rule all:
         "outputs/final/merged/qc_report.tsv",
         expand("outputs/bcftools_vcfs/merged/filt/{intervals}/all.vcf.gz",intervals=intervals),
         "outputs/final/merged/annovar/all_filtered_annovar_table.txt",
-        "outputs/final/merged/quasi_species/all.vcf.gz"
+        "outputs/final/merged/quasi_species/all.vcf"
   #     "outputs/consensus/merged/sars2/all_5.tsv",
 #
 import shutil

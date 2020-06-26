@@ -23,11 +23,12 @@ rule trim_reads:
         out_fastq_one="outputs/fastqs/{sample}.R1.fastq.gz",
         out_fastq_two="outputs/fastqs/{sample}.R2.fastq.gz"
     params:
-        sample_type =  get_sample_type
+        sample_type=get_sample_type,
+        oligos_used=get_oligos_used
     log:
         trim_read_out="log/fastqs/{sample}.log"
     shell:
-        "{SCRIPTS_DIR}/amplicon/run_custom_amplicon.sh {params.sample_type} {input.read_one} {input.read_two} {output.out_fastq_one} {output.out_fastq_two} {OLIGO_POOL_BED} {ARCTIC_FILE} {log}"
+        "{SCRIPTS_DIR}/amplicon/run_custom_amplicon.sh {params.sample_type} {input.read_one} {input.read_two} {output.out_fastq_one} {output.out_fastq_two} {OLIGO_POOL_BED} {ARCTIC_FILE} {ALL_PRIMERS} {params.oligos_used} {log}"
 
 rule kraken_assignment:
     group: "align"

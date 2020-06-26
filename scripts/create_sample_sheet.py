@@ -51,11 +51,15 @@ def make_sample_sheet(sample_sheet,  experiment_name,date, sample_sheet_neb, sam
         Experiment name 
     """
     sheet_line = sheet_header.format(name=experiment_name,date=date)
+    print("HERERER")
+    print(sample_sheet)
     pd_in = pd.read_csv(sample_sheet,sep=",")
+    print(pd_in["index"])
     amp = pd_in["sample"].str.contains("Ms")
     neb = pd_in["sample"].str.contains("NEB")
     pd_in["Lane"] = 1
     pd_in["uid"] = pd_in["uid"].apply(np.char.upper)
+    print(pd_in)
     pd_in["index"] = pd_in["index"].apply(np.char.upper)
     pd_in["index2"] = pd_in["index2"].apply(np.char.upper)
     pd_in["Sample_ID"]  = pd_in["sample"] + "_" + pd_in["uid"]
@@ -63,6 +67,7 @@ def make_sample_sheet(sample_sheet,  experiment_name,date, sample_sheet_neb, sam
     amp_df =  pd_in[amp]
     amp_df_first = amp_df.copy()
     neb_df_first = neb_df.copy()
+    print(amp_df_first.shape)
     for i in range(2,5):
         tmp_row = neb_df_first.copy()
         tmp_row["Lane"] = i

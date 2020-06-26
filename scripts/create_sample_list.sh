@@ -11,6 +11,7 @@ folder=$(dirname $0)
 CLIN_IN=$2
 OUTPUT=$3
 SAMPLE_TYPE=$4
+SAMPLE_SHEET=$5
 while read line
 do
     fastq_one=$(echo $line | awk '{print $2}')
@@ -20,7 +21,7 @@ do
 done < samples1.txt
 paste -d ' ' samples1.txt run_names.txt > samples2.txt
 
-Rscript $folder/create_next_metadata.R samples2.txt $OUTPUT $CLIN_IN $SAMPLE_TYPE
+Rscript $folder/create_next_metadata.R samples2.txt $OUTPUT $CLIN_IN $SAMPLE_TYPE $SAMPLE_SHEET
 rm samples1.txt
 rm run_names.txt
 rm samples2.txt

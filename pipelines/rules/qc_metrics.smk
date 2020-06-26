@@ -172,10 +172,14 @@ rule amplicon_qc_output:
     output:
         temp("outputs/amplicon_qc/{sample}.check_run"),
     params:
-        sample_type=get_sample_type 
+        sample_type=get_sample_type, 
+        oligos_used=get_oligos_used
     run:
         if params.sample_type == "amp":
             shell("{SCRIPTS_DIR}/amplicon/per_amplicon_depth.py -s amp -b {input.bam} -o {output} -q 1 -p {OLIGO_POOL_BED}")
+        elif params.sample_type == "amp_complicated": 
+            #### TODO: make this work for the new set of oligopools. 
+            shell("{SCRIPTS_DIR}/amplicon/per_amplicon_depth.py -s amp -b {input.bam} -o {output} -q 1 -p {ALL_PRIMERS} -c --oligos-used {params.oligos_used}")
         else: 
             shell("echo NOTAMP > {output}")
 
