@@ -72,8 +72,10 @@ trimReadsAmp=function(    #read1
 															max.mismatch = 1, 
 															follow.index = T, 
 															with.indels = F)
+                  print(length(cread1))
 				  to.keep=!is.na(m1)
 				  ### Let's seee if we can filter the reads
+                  print(sum(to.keep))
 				  cread1s=cread1[to.keep]
 				  q1s=q1[to.keep]
 				  m1k=m1[to.keep]
@@ -110,8 +112,9 @@ trimReadsAmp=function(    #read1
 				  #dump reads where read2 is  polyG
 				  r2.to.keep=vcountPattern(polyG, r2.trimmed)==0
 				  #could comment out next 2 lines, mostly for debugging
-				  print('polyG')
-				  print(sum(!r2.to.keep))
+                  print(oname)
+				  #print('polyG')
+				  #print(sum(!r2.to.keep))
 				  umi1=umi1[r2.to.keep]
 				  r1.trimmed=r1.trimmed[r2.to.keep]
 				  q1.trimmed=q1.trimmed[r2.to.keep]
@@ -123,10 +126,10 @@ trimReadsAmp=function(    #read1
 				  u.umis=rle(sort(as.character(xscat(umi1))))
 				  bdf=data.frame(barcode=u.umis$values, count=u.umis$lengths, stringsAsFactors=F)
 				  #omatch[[oname]]=bdf
-				  print(oname)
-				  print(nrow(bdf))
-				  print(sum(bdf$count))
-				  
+				  #print(oname)
+				  #print(nrow(bdf))
+				  #print(sum(bdf$count))
+				  print(length(r1.trimmed)) 
 				  if(length(r1.trimmed)>0){
 				  cname=xscat(BStringSet(rep(oname,length(r1.trimmed))), ':', BStringSet(1:length(r1.trimmed)), ':', BStringSet(umi1), ':', BStringSet(umi2))
 				  writeFastq( ShortReadQ(sread=r1.trimmed, quality=q1.trimmed,  id= cname),  file=out.file1, mode='a', full=FALSE, compress=TRUE)
@@ -135,7 +138,7 @@ trimReadsAmp=function(    #read1
     }
     }
 
-    print("HERE")
+    #print("HERE")
     close(fi1)
     close(fi2)
 }
@@ -231,8 +234,8 @@ trimReadsArctic=function(    #read1
               #dump reads where read2 is  polyG
               r2.to.keep=vcountPattern(polyG, r2.trimmed)==0
               #could comment out next 2 lines, mostly for debugging
-              print('polyG')
-              print(sum(!r2.to.keep))
+              #print('polyG')
+              #print(sum(!r2.to.keep))
               umi1=umi1[r2.to.keep]
               r1.trimmed=r1.trimmed[r2.to.keep]
               q1.trimmed=q1.trimmed[r2.to.keep]
@@ -243,9 +246,9 @@ trimReadsArctic=function(    #read1
               u.umis=rle(sort(as.character(xscat(umi1))))
               bdf=data.frame(barcode=u.umis$values, count=u.umis$lengths, stringsAsFactors=F)
               #omatch[[oname]]=bdf
-              print(oname)
-              print(nrow(bdf))
-              print(sum(bdf$count))
+              #print(oname)
+              #print(nrow(bdf))
+              #print(sum(bdf$count))
               
               if(length(r1.trimmed)>0){
               cname=xscat(BStringSet(rep(oname,length(r1.trimmed))), ':', BStringSet(1:length(r1.trimmed)), ':', BStringSet(umi1), ':', BStringSet(umi2))
@@ -281,7 +284,7 @@ names(oPool.primers) = oPool.primers.table[,4]
 # stuff starts happening here
 #loop through fastq files 
 primers = read.table(arctic.primers, header=T, sep="\t", stringsAsFactors=F)
-print(head(primers))
+#print(head(primers))
 primers = primers[grep('RIGHT', primers$name),]
 if (type == "arctic"){
 	primers = read.table(arctic.primers, header=T, sep="\t", stringsAsFactors=F)
@@ -327,13 +330,18 @@ if (type == "arctic"){
 	
     ### Send the arctic information through. 
     # 2 is arctic, 1,3,4 are amplicon. 
-
+    print(x)
     if (any(c(1,3,4) %in% x)){
         y  = x[x!=2]        
+        print(y)
         oPool.primers.table = read.delim(all.primers, header=F, sep="\t", stringsAsFactors=F)
         oPool.primers.table = oPool.primers.table[which(oPool.primers.table[,3] %in% y),]
         oPool.primers.table = oPool.primers.table[!duplicated(oPool.primers.table[,2]),]
+        #write.table(oPool.primers.table, file="test_data1.txt", quote=F, row.names=F,col.names=T,sep="\t")
+        #oPool.primers.table = oPool.primers.table[oPool.primers.table[,1] == "c19_1452_1477",]
+        #write.table(oPool.primers.table, file="test_data.txt", quote=F, row.names=F,col.names=T,sep="\t")
         oPool.primers = DNAStringSet(oPool.primers.table[,2])
+        #print(oPool.primers.table)
         names(oPool.primers) = oPool.primers.table[,1]
         trimReadsAmp(#read1
                        fastq_one,

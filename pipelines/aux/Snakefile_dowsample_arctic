@@ -1,0 +1,28 @@
+###
+###
+
+
+configfile:  workflow.current_basedir + "../defaults.yaml" 
+CONFIGFILE= workflow.current_basedir + "..//defaults.yaml" 
+
+include: "rules/utils.smak"
+
+metadata=fastq_match(config)
+
+
+def create_sample_groups(mapped_uids):
+
+if config["merge_rule"] == "uid_oligo":
+    mapped_uid, sample_names_hash, mapped_uids_read_one, mapped_uids_read_two = uid_library_to_sample_hash(merge_rule="uid_oligo") 
+    ## group samples
+    #
+    ## get_sample_groups 
+else:
+    print("Downsample failed")
+
+rule all:
+    input:
+        expand("outputs/downsample/{sample}.bam", sample=
+
+
+rule

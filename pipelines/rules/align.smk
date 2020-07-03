@@ -208,26 +208,27 @@ def get_sample_name_for_merge(wildcards):
 	sample_id = sample_names_hash[wildcards.sample][0]
 	# TODO REMOVE
 	return(sample_id)
-rule merged_bams:
-    shadow: "minimal"
-    group: "align"
-    input:
-        bams = get_bams, 
-        bai = get_bai
-    output:
-        bam="outputs/md/merged/{intervals}/{sample}.bam",
-        bai="outputs/md/merged/{intervals}/{sample}.bam.bai"
-    params:
-        rg=get_sample_name_for_merge    
-    run:
-        if len(input.bams) != 1:
-            # Skip merge
-            shell("samtools merge tmp.bam {input.bams} && samtools sort tmp.bam > sorted.bam")
-            shell("java -jar {PICARD_PATH} AddOrReplaceReadGroups I=sorted.bam O={output.bam} RGID=1 RGSM={params.rg} RGLB=4 RGPL=ILLUMINA RGPU=unit1")
-        else:
-            shell("java -jar {PICARD_PATH} AddOrReplaceReadGroups I={input.bams} O={output.bam} RGID=1 RGSM={params.rg} RGLB=4 RGPL=ILLUMINA RGPU=unit1")
-        shell("samtools index {output}")
-
+#TODO: merged bams
+#rule merged_bams:
+#    shadow: "minimal"
+#    group: "align"
+#    input:
+#        bams = get_bams, 
+#        bai = get_bai
+ #   output:
+##        bam="outputs/md/merged/{intervals}/{sample}.bam",
+#        bai="outputs/md/merged/{intervals}/{sample}.bam.bai"
+#    params:
+#        rg=get_sample_name_for_merge    
+#    run:
+#        if len(input.bams) != 1:
+#            # Skip merge
+#            shell("samtools merge tmp.bam {input.bams} && samtools sort tmp.bam > sorted.bam")
+#            shell("java -jar {PICARD_PATH} AddOrReplaceReadGroups I=sorted.bam O={output.bam} RGID=1 RGSM={params.rg} RGLB=4 RGPL=ILLUMINA RGPU=unit1")
+#        else:
+#            shell("java -jar {PICARD_PATH} AddOrReplaceReadGroups I={input.bams} O={output.bam} RGID=1 RGSM={params.rg} RGLB=4 RGPL=ILLUMINA RGPU=unit1")
+#        shell("samtools index {output}")
+#
 
 def get_rg(wildcards):
     strain_name =get_sample_name(wildcards)
@@ -270,32 +271,32 @@ rule picard_sort:
         "{SCRIPTS_DIR}/picard_sort.sh {params.tmpdir} {PICARD_PATH} {input} {output} {params.order} {log} {resources.mem_mb}"
 
 
-rule picard_mark_duplicates:
-    input:
-        ("outputs/sorted/{intervals}/{sample}.sorted.bam")
-    output:
-        bam_out=("outputs/md/{intervals}/{sample}.sorted.md.bam"),
-        metrics_out="outputs/{intervals}/md/{sample}.metrics.txt"
-    group: "align"
-    log:
-        "logs/picard_mark_duplicates/{intervals}/{sample}.log"
-    params:
-        tmpdir="-Djava.io.tmpdir=tmpdir",
-    shell:
-        "{SCRIPTS_DIR}/picard_md.sh {params.tmpdir} {PICARD_PATH} {input} {output.bam_out} {output.metrics_out} {log}"
-
-rule picard_index:
-    input:
-        "outputs/md/{intervals}/{sample}.sorted.md.bam"
-    output:
-        "outputs/md/{intervals}/{sample}.sorted.md.bam.bai"
-    group: "align"
-    log:
-        "logs/picard_index/{intervals}/{sample}.log"
-    params:
-        tmpdir="-Djava.io.tmpdir=tmpdir"
-    shell:
-        "{SCRIPTS_DIR}/picard_index.sh {params.tmpdir} {PICARD_PATH} {input} {output} {log}"
+#rule picard_mark_duplicates:
+#    input:
+#        ("outputs/sorted/{intervals}/{sample}.sorted.bam")
+#    output:
+#        bam_out=("outputs/md/{intervals}/{sample}.sorted.md.bam"),
+#        metrics_out="outputs/{intervals}/md/{sample}.metrics.txt"
+#    group: "align"
+#    log:
+#        "logs/picard_mark_duplicates/{intervals}/{sample}.log"
+#    params:
+#        tmpdir="-Djava.io.tmpdir=tmpdir",
+#    shell:
+#        "{SCRIPTS_DIR}/picard_md.sh {params.tmpdir} {PICARD_PATH} {input} {output.bam_out} {output.metrics_out} {log}"
+#
+#rule picard_index:
+#    input:
+#        "outputs/md/{intervals}/{sample}.sorted.md.bam"
+#    output:
+#        "outputs/md/{intervals}/{sample}.sorted.md.bam.bai"
+#    group: "align"
+#    log:
+#        "logs/picard_index/{intervals}/{sample}.log"
+#    params:
+#        tmpdir="-Djava.io.tmpdir=tmpdir"
+#    shell:
+#        "{SCRIPTS_DIR}/picard_index.sh {params.tmpdir} {PICARD_PATH} {input} {output} {log}"
 
 rule bwa_map:
     input:
@@ -319,7 +320,7 @@ rule picard_sort2:
     input:
         ("outputs/mapping_stats/align/{sample}.bam")
     output:
-        temp("outputs/mapping_stats/sorted/{sample}.sorted.bam")
+        ("outputs/mapping_stats/sorted/{sample}.sorted.bam")
     group: "align2"
     resources:
         mem_mb=16000,
@@ -335,7 +336,7 @@ rule picard_sort2:
 
 rule picard_mark_duplicates2:
     input:
-        ("outputs/mapping_stats/sorted/{sample}.sorted.bam")
+        bam_in = ("outputs/mapping_stats/sorted/{sample}.sorted.bam")
         #("outputs/sorted_mapping_stats/{sample}.sorted.bam")
     output:
         bam_out=("outputs/mapping_stats/md/{sample}.sorted.md.bam"),
@@ -348,8 +349,14 @@ rule picard_mark_duplicates2:
         "logs/picard_mark_duplicates2/{sample}.log"
     params:
         tmpdir="-Djava.io.tmpdir=tmpdir",
-    shell:
-        "{SCRIPTS_DIR}/picard_md.sh {params.tmpdir} {PICARD_PATH} {input} {output.bam_out} {output.metrics_out} {log}"
+        sample_type=get_sample_type
+    run:
+        if "neb" in params.sample_type: 
+            run("{SCRIPTS_DIR}/picard_md.sh {params.tmpdir} {PICARD_PATH} {input.bam_in} {output.bam_out} {output.metrics_out} {log}")
+        else:
+            shell("touch {output.metrics_out}")
+            os.symlink(os.path.abspath(input.bam_in), output.bam_out)
+            ## ##
 
 rule picard_index2:
     input:
@@ -366,6 +373,66 @@ rule picard_index2:
         tmpdir="-Djava.io.tmpdir=tmpdir",
     shell:
         "{SCRIPTS_DIR}/picard_index.sh {params.tmpdir} {PICARD_PATH} {input} {output} {log}"
+
+
+rule extract_reads_mapping_to_sars2:
+    shadow: "minimal"
+    group: "variant_calling"
+    input:
+        bam="outputs/mapping_stats/md/{sample}.sorted.md.bam",
+        bam_index="outputs/mapping_stats/md/{sample}.sorted.md.bam.bai"
+    output:
+        bam="outputs/mapping_stats/bam_subset/{sample}.bam",
+        bai="outputs/mapping_stats/bam_subset/{sample}.bam.bai",
+        summarise_mapping="outputs/mapping_stats/bam_subset/{sample}.summary"
+    log:
+        "logs/extract_mapping_sars2/{sample}.log"
+    params:
+        tmpdir="-Djava.io.tmpdir=tmpdir",
+        cluster="-l h_rt=24:00:00 -l h_data=16G -cwd",
+        rg="@RG\\tID:{sample}\\tSM:{sample}\\tPL:illumina\\tLB:lib1\\tPU:unit1",
+        sample_type=get_sample_type
+    shell:
+        "{SCRIPTS_DIR}/subset_and_index_bam.sh  {input.bam} {output.bam} sars2 {MAPQ_FILT} {log} {PICARD_PATH} {params.tmpdir} {params.sample_type} {output.summarise_mapping}"
+
+
+
+def get_all_uid_bam(wildcards):
+    samples = expand("outputs/mapping_stats/bam_subset/{sample}.bam", sample=mapped_uid[wildcards.sample])
+    return(samples)
+
+#rule merge_sars2_bams:
+    #    shadow: "minimal"
+#    group: "merge_sars2"
+#    input:
+        #        bams=get_all_uid_bam
+#    output:
+        #        bam="outputs/mapping_stats/bam_subset/merged/{sample}.bam",
+#        bai="outputs/mapping_stats/bam_subset/merged/{sample}.bam.bai#"
+    #run:
+        ## create new read_group  ###
+        ## copy new read group to merged bams ## 
+
+rule merged_bams:
+    shadow: "minimal"
+    group: "align"
+    input:
+        bams = get_all_uid_bam 
+    output:
+        bam="outputs/mapping_stats/bam_subset/merged/{sample}.bam",
+        bai="outputs/mapping_stats/bam_subset/merged/{sample}.bam.bai"
+        #bam="outputs/mapping_stats/bam_subset/merged/{intervals}/{sample}.bam",
+        #bai="outputs/md/merged/{intervals}/{sample}.bam.bai"
+    params:
+        rg=get_sample_name_for_merge    
+    run:
+        if len(input.bams) != 1:
+            # Skip merge
+            shell("samtools merge tmp.bam {input.bams} && samtools sort tmp.bam > sorted.bam")
+            shell("java -jar {PICARD_PATH} AddOrReplaceReadGroups I=sorted.bam O={output.bam} RGID=1 RGSM={params.rg} RGLB=4 RGPL=ILLUMINA RGPU=unit1")
+        else:
+            shell("java -jar {PICARD_PATH} AddOrReplaceReadGroups I={input.bams} O={output.bam} RGID=1 RGSM={params.rg} RGLB=4 RGPL=ILLUMINA RGPU=unit1")
+        shell("samtools index {output}")
 #rule trim_reads:
 #    shadow: "minimal"
 #    output:
@@ -401,20 +468,3 @@ rule picard_index2:
 #
 #
 #### Extract 
-#rule extract_reads_mapping_to_sars2:
-#    shadow: "minimal"
-#    group: "variant_calling"
-#    input:
-#        bam="outputs/md/{sample}.sorted.md.bam",
-#        bam_index="outputs/md/{sample}.sorted.md.bam.bai"
-#    output:
-#        bam="outputs/bam_subset/{sample}.{intervals}.bam",
-#        bai="outputs/bam_subset/{sample}.{intervals}.bam.bai"
-#    log:
-#        "logs/picard_index/{sample}.{intervals}.log"
-#    params:
-#        tmpdir="-Djava.io.tmpdir=tmpdir",
-#        cluster="-l h_rt=24:00:00 -l h_data=16G -cwd",
-#        rg="@RG\\tID:{sample}\\tSM:{sample}\\tPL:illumina\\tLB:lib1\\tPU:unit1"
-#    shell:
-#        "{SCRIPTS_DIR}/subset_and_index_bam.sh  {input.bam} {output.bam} {intervals} {MAPQ_FILT} {log} {PICARD_PATH} {params.tmpdir} {SARS_REF} {params.rg}"

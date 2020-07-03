@@ -30,17 +30,25 @@ rule generate_coverage_plot:
         Use bedtools to get depth per bp.
     
     """
+    shadow: "minimal"
     resources:
         mem_mb=16000,
         walltime=43200
     shadow: "minimal"
     group: "ag"
     input:
-        bam="outputs/md/{intervals}/{sample}.sorted.md.bam"
+        bam="outputs/mapping_stats/bam_subset/{sample}.bam"
     output:
         "outputs/coverage/{intervals}/{sample}.cov"
-    shell:
-        "bedtools genomecov -ibam {input.bam} -d > {output}"
+    params:
+        sample_type = get_sample_type
+    run:
+        if "neb" in params.sample_type:
+            shell("samtools view -h -F 1024 -bS {input.bam} > test.bam")
+            shell("samtools index test.bam")
+            shell("bedtools genomecov -ibam test.bam -d > {output}")
+        else:
+            shell("bedtools genomecov -ibam {input.bam} -d > {output}")
 
 rule make_coverage_plot:
     """
@@ -167,8 +175,8 @@ rule qc_output:
 
 rule amplicon_qc_output:
     input:
-        bam="outputs/md/sars2/{sample}.sorted.md.bam",
-        bai="outputs/md/sars2/{sample}.sorted.md.bam.bai"
+        bam="outputs/mapping_stats/bam_subset/{sample}.bam",
+        bai="outputs/mapping_stats/bam_subset/{sample}.bam.bai"
     output:
         temp("outputs/amplicon_qc/{sample}.check_run"),
     params:
@@ -206,21 +214,29 @@ rule aggregate_amplicon_qc:
     input:
         expand("outputs/amplicon_qc/{sample}.check_run",sample=samples)
     output:
-        "outputs/amplicon_qc/amplicon_df.txt"
+        amp_df="outputs/amplicon_qc/amplicon_df.txt",
+        amp_complicated_df="outputs/amplicon_qc/amplicon_df_complicated.txt"
     run:
-        with open(output[0],"w") as out_f:
-            out_f.write("sample\tamplicon\tcount\tlibrary_type\n")
-            for f in input:
-                sample_in = os.path.basename(f).split(".check_run")[0]
-                with open(f) as in_f:
-                    line = in_f.readline()
-                    if "NOTAMP" in line:
-                        continue
-                    #out_f.write(sample_in +"\t" + line)
-                    for i, line in enumerate(in_f):
-                        if i > 0:
-                            out_f.write(sample_in +"\t" + line)
-            # otherwise add the other files to the script
+        with open(output.amp_df,"w") as out_f:
+            with open(output.amp_complicated_df,"w") as out_f2:
+                out_f.write("sample\tamplicon\tcount\tlibrary_type\n")
+                out_f2.write("sample\tamplicon\tcount\toligo_set\toligos_used\n")
+                for f in input:
+                    sample_in = os.path.basename(f).split(".check_run")[0]
+                    with open(f) as in_f:
+                        line = in_f.readline()
+                        if "NOTAMP" in line:
+                            continue
+                        if "oligos_used" in line:
+                            for i, line in enumerate(in_f):
+                                if i > 0:
+                                    out_f2.write(sample_in + "\t" + line)
+                        else:  
+                            for i, line in enumerate(in_f):
+                                if i > 0:
+                                    out_f.write(sample_in + "\t" + line)
+                        #out_f.write(sample_in +"\t" + line)
+                # otherwise add the other files to the script
     
 
 rule auspice_output:

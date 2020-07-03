@@ -38,17 +38,16 @@ def output_complicated_dataframe(count_hash, oligo_pool, output_df, oligos_used)
     
     with open(oligo_pool) as oligo_in:
         with open(output_df,"w") as out_df:
-            out_df.write("primer_name\tcount\tlibrary_type\n")
+            out_df.write("primer_name\tcount\toligo_set\toligos_used\n")
             for line in oligo_in:
                 split_line = line.strip().split("\t")
                 primer_name = split_line[0]
                 set_of_oligos = split_line[2]
                 try:
                     count = count_hash[primer_name]
-                    print(count)
                 except:
                     count = 0
-                out_df.write(primer_name + "_" + set_of_oligos+ "\t" + str(count) + "\t" + oligos_used+ "\n")
+                out_df.write(primer_name + "\t" + str(count) + "\t"  + set_of_oligos + "\t"+ oligos_used+ "\n")
 
 
 

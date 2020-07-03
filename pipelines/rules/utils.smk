@@ -15,7 +15,8 @@ def uid_library_to_sample_name():
     sample_names = {}
     mapped_uids_read_one = {}
     mapped_uids_read_two = {}
-    start_id = 200
+    start_id = 1  
+    print(len(unique_id_library_type))
     for uid_name in unique_id_library_type: 
         g = list((metadata["sample"][metadata["id_library_type"] == uid_name]))
         r1 =  list((metadata["fastq_one"][metadata["id_library_type"] == uid_name]))
@@ -28,6 +29,37 @@ def uid_library_to_sample_name():
         mapped_uids_read_two["LA_{:04d}".format(start_id)] = r2
         start_id += 1
     return(mapped_uids_library, sample_names, mapped_uids_read_one, mapped_uids_read_two)
+
+
+def uid_library_to_sample_hash(merge_rule="uid_type"):
+    if merge_rule == "uid_type":
+        id_library_type = metadata["uid"] + "_" + metadata["sample_type"] 
+    elif merge_rule == "uid":
+        id_library_type = metadata["uid"]
+    elif merge_rule == "uid_oligo":
+        id_library_type = metadata["uid"]  + "_" + metadata["oligos_used"]
+
+    metadata["id_library_type"] = id_library_type
+    unique_id_library_type = list(pd.unique(metadata["id_library_type"]))
+    mapped_uids_library = {} 
+    sample_names = {}
+    mapped_uids_read_one = {}
+    mapped_uids_read_two = {}
+    start_id = 1 
+    for uid_name in unique_id_library_type: 
+        g = list((metadata["sample"][metadata["id_library_type"] == uid_name]))
+        r1 =  list((metadata["fastq_one"][metadata["id_library_type"] == uid_name]))
+        r2 =  list((metadata["fastq_two"][metadata["id_library_type"] == uid_name]))
+        read_one = list((metadata["sample"][metadata["id_library_type"] == uid_name]))
+        read_two = list((metadata["sample"][metadata["id_library_type"] == uid_name]))
+        sample_names["LA_{:04d}".format(start_id)] = ["LA-{:04d}".format(start_id), uid_name]
+        mapped_uids_library["LA_{:04d}".format(start_id)]= g
+        mapped_uids_read_one["LA_{:04d}".format(start_id)] = r1
+        mapped_uids_read_two["LA_{:04d}".format(start_id)] = r2
+        start_id += 1
+    return(mapped_uids_library, sample_names, mapped_uids_read_one, mapped_uids_read_two)
+
+
 def uid_library_to_sample_name_and_readgroup(): 
     id_library_type  = metadata["uid"] + "_" + metadata["sample_type"] 
     metadata["id_library_type"] = id_library_type
@@ -36,7 +68,7 @@ def uid_library_to_sample_name_and_readgroup():
     sample_names = {}
     mapped_uids_read_one = {}
     mapped_uids_read_two = {}
-    start_id = 200
+    start_id = 1 
     for uid_name in unique_id_library_type: 
         g = list((metadata["sample"][metadata["id_library_type"] == uid_name]))
         r1 =  list((metadata["fastq_one"][metadata["id_library_type"] == uid_name]))

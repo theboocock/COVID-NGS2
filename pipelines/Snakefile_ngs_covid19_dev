@@ -8,7 +8,7 @@ CONFIGFILE= workflow.current_basedir + "/defaults.yaml"
 
 wildcard_constraints: 
     sample="(?!merged)([a-z0-9A-Z-_]+)",
-    intervals="(?!merged)([a-z0-9A-Z-_]+)",
+    intervals="(?!merged)(?!phylo)([a-z0-9A-Z-_]+)",
     depth="(?!merged)([a-z0-9A-Z-_]+)",
     uid_lib="(?!merged)([a-z0-9A-Z-_]+)"
 import configparser
@@ -55,22 +55,42 @@ min_cov = 0.9
 
 taxon_dict = read_taxid(TAXON_IN)
 metadata=fastq_match(config)
+#type_uid 
 samples=metadata["sample"]
+rg_name=metadata["strain"]
+# uid type merges libraries across samples
+try:
+    if config["merge_rule"] == "uid_type": 
+        mapped_uid, sample_names_hash, mapped_uids_read_one, mapped_uids_read_two = uid_library_to_sample_name_and_readgroup()
+    # merges all libraries by uid
+    elif config["merge_rule"] == "uid":
+        #  print("HERE")
+        mapped_uid, sample_names_hash, mapped_uids_read_one, mapped_uids_read_two = uid_library_to_sample_name() 
+    elif config["merge_rule"] == "uid_oligo":
+        mapped_uid, sample_names_hash, mapped_uids_read_one, mapped_uids_read_two = uid_library_to_sample_hash(merge_rule="uid_oligo") 
+except KeyError:
+    mapped_uid, sample_names_hash, mapped_uids_read_one, mapped_uids_read_two = uid_library_to_sample_name_and_readgroup()
+    pass
+
+ #   print(mapped_uid)
 
 ### metadata["sample"]
 #### metadata["strain"]
 
-
-rg_name=metadata["strain"]
-mapped_uid, sample_names_hash, mapped_uids_read_one, mapped_uids_read_two = uid_library_to_sample_name_and_readgroup()
+#mapped_uid, sample_names_hash, mapped_uids_read_one, mapped_uids_read_two = uid_library_to_sample_name_and_readgroup()
 #with open("sample_mapping.txt","w") as out_f:
 #    for key, items in mapped_uid.items():
 #        print(key)
 #        print(items)
 #        out_f.write(str(key) + " " + " ".join([str(o) for o in items]) + "\n")
+#samples=["2011"]
+#rule all:
+#    input:
+#        expand("outputs/kraken2/{sample}.kraken_report.txt",sample=samples)
 rule all:
     input:
-        expand("outputs/md/merged/{intervals}/{uid_lib}.bam",intervals=intervals, uid_lib=mapped_uid.keys()),
+        expand("outputs/mapping_stats/bam_subset/merged/{uid_lib}.bam", uid_lib=mapped_uid.keys()),
+        #expand("outputs/kraken2/{sample}.kraken_report.txt",sample=samples),
         expand("outputs/consensus/merged/{intervals}/all_{depth}.fasta", depth=depth_range, intervals=intervals),
         expand("outputs/abundances/merged/{sample}.bracken", sample=mapped_uid.keys()), 
         expand("outputs/coverage/merged/coverage_plots/{intervals}/{sample}.png", intervals=intervals, sample=mapped_uid.keys()), 
@@ -79,7 +99,7 @@ rule all:
        # TODO check if it works#
       #"test.png",
         expand("outputs/coverage/coverage_plots/{intervals}/{sample}.png", intervals=intervals, sample=samples), 
-        expand("outputs/kraken_bams/{intervals}/{sample}.kraken.bam",intervals=intervals,sample=samples),
+        #expand("outputs/kraken_bams/{intervals}/{sample}.kraken.bam",intervals=intervals,sample=samples),
         #expand("outputs/kraken_bams/{intervals}/{sample}.kraken.bam",sample=samples,intervals=intervals),
         #expand("outputs/vcfs_filt/{intervals}/all.filt.vcf.gz",intervals=intervals),
         #expand("outputs/consensus/{depth}/{intervals}/{sample}.fasta",depth=depth_range,sample=samples,intervals=intervals),
@@ -108,7 +128,7 @@ rule all:
         expand("outputs/bcftools_vcfs/merged/filt/{intervals}/all.vcf.gz",intervals=intervals),
         "outputs/final/merged/annovar/all_filtered_annovar_table.txt",
         "outputs/final/merged/quasi_species/all.vcf"
-  #     "outputs/consensus/merged/sars2/all_5.tsv",
+#  #     "outputs/consensus/merged/sars2/all_5.tsv",
 #
 import shutil
 import numpy as np
@@ -117,6 +137,7 @@ rule generate_final_dataset_package:
         qc_report_in="outputs/qc_report/all.qc",
         pangolin_out="outputs/pangolin/lineages.csv",
         input_consensus = expand("outputs/consensus/merged/{intervals}/all_{depth}.fasta", depth=MIN_DEPTH, intervals=intervals),
+        input_consensus_phylo = expand("outputs/consensus/merged/phylo/{intervals}/all_{depth}.fasta", depth=MIN_DEPTH, intervals=intervals),
         read_one = expand("outputs/filtered_fastqs/{intervals}/{sample}.R1.fastq.gz",intervals=intervals,sample=samples),
         read_two = expand("outputs/filtered_fastqs/{intervals}/{sample}.R2.fastq.gz",intervals=intervals, sample=samples),
         depleted_read_one = expand("outputs/depleted_fastqs/human/{sample}.R1.fastq.gz",sample=samples),
@@ -130,7 +151,8 @@ rule generate_final_dataset_package:
         filtered_fastqs=directory("outputs/final/merged/filtered_fastqs") ,
         depeleted_fastqs=directory("outputs/final/merged/host_depleted_fastqs"),
         consensus_fasta="outputs/final/merged/all.fasta",
-        final_vcf="outputs/final/merged/all.vcf.gz"
+        final_vcf="outputs/final/merged/all.vcf.gz",
+        phylo_fasta="outputs/final/merged/phylo/all.fasta"
     run:
         # Let's create the QC table for the merged libraries.
         #
@@ -190,10 +212,10 @@ rule generate_final_dataset_package:
         shell("touch {output.consensus_fasta}")
         shell("touch {output.merged_csv}")
         shell("touch {output.final_vcf}")
+        shell("touch {output.phylo_fasta}")
         if os.path.getsize(input.input_consensus[0]) != 0:
-
             shutil.copy(input.input_consensus[0], output.consensus_fasta)
-
+            shutil.copy(input.input_consensus_phylo[0], output.phylo_fasta)
             os.makedirs("outputs/final/merged/filtered_fastqs/",exist_ok=True)
             os.makedirs("outputs/final/merged/host_depleted_fastqs/",exist_ok=True)
             in_fasta = pyfasta.Fasta(input.input_consensus[0])
@@ -238,7 +260,7 @@ rule generate_coverage_plot_merged:
     shadow: "minimal"
     group: "ag"
     input:
-        bam="outputs/md/merged/{intervals}/{sample}.bam"
+        bam="outputs/mapping_stats/bam_subset/merged/{sample}.bam"
     output:
         "outputs/coverage/merged/{intervals}/{sample}.cov"
     shell:

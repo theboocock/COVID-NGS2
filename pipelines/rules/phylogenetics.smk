@@ -2,7 +2,7 @@ rule run_pangolin:
     shadow: "shallow"
     conda: workflow.basedir + "/envs/pangolin.yaml"
     input:
-        "outputs/consensus/merged/sars2/all_5.fasta"
+        "outputs/consensus/merged/phylo/sars2/all_5.fasta"
     output:
         "outputs/pangolin/lineages.csv"
     threads:

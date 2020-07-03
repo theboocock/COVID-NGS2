@@ -29,7 +29,7 @@ __BCFTOOLS_FILT_TEMPLATE__ = """
 
 ## TODO: remove SNPS ONLY and biallelic calls
 __BCFTOOLS_SAMPLE_TEMPLATE__ = """
-    bcftools view -m2 -M2 -v snps {0} -s {1} | bgzip -c > sample.vcf.gz && tabix -p vcf sample.vcf.gz 
+    bcftools view -m2 -M2 -v snps {0} -s {1} | bgzip -c > sample.vcf.gz && tabix -f -p vcf sample.vcf.gz 
 """
 
 __BCFTOOLS_QUERY_TEMPLATE__= """
@@ -55,41 +55,35 @@ __BEDTOOLS_MERGE__= """
 """
 
 
-def get_masking_bed(bam_input, min_depth, max_strand_prop):
+def get_masking_bed(bam_input, min_depth, max_strand_prop,coverage_in):
 
-    plus_cmd = __BEDTOOLS_MASKING_STRAND__.format(bam_input ,"+", "plus.bed")
-    subprocess.check_call(plus_cmd, shell=True)
-    minus_cmd = __BEDTOOLS_MASKING_STRAND__.format(bam_input,"-","minus.bed")
-    subprocess.check_call(minus_cmd,shell=True)
-    with open("plus.bed") as plus_in:
-        with open("minus.bed") as minus_in:
-            with open("mask.bed","w") as mask_out:
-                for line1, line2 in zip(plus_in, minus_in):
-                    line1s = line1.split()
-                    line2s = line2.split()
-                    chrom = line1s[0]
-                    end = int(line1s[1])
-                    start = int(line1s[1]) - 1
-                    plusc = int(line1s[2])
-                    minc = int(line2s[2])
-                    depth = plusc + minc
-                    if depth < min_depth:
-                        mask_out.write(chrom + "\t" + str(start) + "\t" + str(end)+"\n")
-                        continue
-                    max_c = max(minc, plusc)
-                    if max_c/(depth*1.0) > max_strand_prop:
-                        mask_out.write(chrom + "\t" + str(start) + "\t" + str(end) + "\n")
+    with open(coverage_in) as plus_in:
+        with open("mask.bed","w") as mask_out:
+            for line1 in plus_in: 
+                line1s = line1.split()
+                #line2s = line2.split()
+                chrom = line1s[0]
+                end = int(line1s[1])
+                start = int(line1s[1]) - 1
+                plusc = int(line1s[2])
+                #minc = int(line2s[2])
+                depth = plusc 
+                if depth < min_depth:
+                    mask_out.write(chrom + "\t" + str(start) + "\t" + str(end)+"\n")
 
 def get_sample_vcf(vcf_gz, sample):
     sample_cmd = __BCFTOOLS_SAMPLE_TEMPLATE__.format(vcf_gz, sample)
     print(sample_cmd)
     subprocess.check_call(sample_cmd,shell=True)
 
+import shutil
 def get_consensus_fasta(reference_genome, sample, output_consensus, output_cov, snps_to_exclude_bed):
 
-    merged_bed_cmd = __BEDTOOLS_MERGE__.format("mask.bed",snps_to_exclude_bed)
-    print(merged_bed_cmd)
-    subprocess.check_call(merged_bed_cmd,shell=True)
+    if snps_to_exclude_bed is not None:
+        merged_bed_cmd = __BEDTOOLS_MERGE__.format("mask.bed",snps_to_exclude_bed)
+        subprocess.check_call(merged_bed_cmd,shell=True)
+    else:
+        merged_bed_cmd = shutil.copy("mask.bed", "merged_masked.bed") 
 
     con_cmd = __BCFTOOLS_CONSENSUS_TEMPLATE__.format(sample, reference_genome, "con.fasta")
     subprocess.check_call(con_cmd,shell=True)
@@ -112,10 +106,11 @@ def main():
     parser.add_argument("-p","--max-strand-prop",dest="max_strand_prop", help="Minimum quality",default=1.0)
     parser.add_argument("-b","--bcftools-path", dest="bcftools_path", help="Bcftools path")
     parser.add_argument("-r","--reference-genome",dest="reference_genome", help="Reference genome",required=True)
-    parser.add_argument("-m","--masked-bed",dest="masked_bed", help="Masked bed file", required=True)
+    parser.add_argument("-m","--masked-bed",dest="masked_bed", help="Masked bed file")
     parser.add_argument("-i","--bam",dest="bam_input", help="Bam input file") 
     parser.add_argument("-o","--output-fasta",dest="output_fasta", help="output fasta", required=True)
     parser.add_argument("-c","--coverage-output",dest="coverage_output", help="Coverage output", required=True)
+    parser.add_argument("--coverage-in", dest="coverage_in",help="Coverage input", required=True)
     args = parser.parse_args()
     vcf_gz = args.vcf_gz
     min_depth = int(args.min_depth)
@@ -127,9 +122,10 @@ def main():
     output_fasta = args.output_fasta
     coverage_output = args.coverage_output
     snps_to_exclude = args.masked_bed
+    coverage_in = args.coverage_in
     print(sample)
     get_sample_vcf(vcf_gz=vcf_gz, sample=sample)
-    get_masking_bed(bam_input, min_depth, max_strand_prop) 
+    get_masking_bed(bam_input, min_depth, max_strand_prop,coverage_in) 
     get_consensus_fasta(reference,sample, output_fasta, coverage_output, snps_to_exclude)
 if __name__=="__main__":
     main()

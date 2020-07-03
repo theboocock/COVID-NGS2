@@ -15,14 +15,28 @@ MAPQ_FILT=$4
 LOG=$5
 PICARD=$6
 TMP=$7
+SAMPLE_TYPE=$8
+SUMMARISE_MAPPING=$9
+echo $SAMPLE_TYPE
+touch $SUMMARISE_MAPPING
+touch $LOG
 samtools view -H $INPUT_BAM > header.tmp
 cat header.tmp | grep "@HD" > top.tmp
 cat header.tmp | grep -A 20 "${CONTIG}" > bot.tmp
 cat top.tmp bot.tmp > header.tmp 
-echo "Done!" > $LOG
-samtools view  -q $MAPQ_FILT $INPUT_BAM $CONTIG > tmp.sam 
-cat header.tmp tmp.sam  | samtools view -hbS > tmp2.bam
+samtools view  -q $MAPQ_FILT $INPUT_BAM $CONTIG > tmp.sam  2> /dev/null
+cat header.tmp tmp.sam  | samtools view -hbS > tmp2.bam  2> /dev/null
 
-samtools view -h tmp2.bam | awk 'BEGIN{OFS="\t"} {if($7 != "*"){print $0}}' |  samtools view -hb > tmp3.bam
-java -Xmx4g $TMP -jar $PICARD FixMateInformation I=tmp3.bam O=$OUTPUT_BAM
+samtools view -h tmp2.bam | awk 'BEGIN{OFS="\t"} {if(($7 == "=" || $0 ~ "@") && $7 != "*" ){print $0}}' |  samtools view -hb > tmp4.bam 2> /dev/null
+
+DIR=$(dirname $0)
+if [[ "${SAMPLE_TYPE}" =~ amp ]]; then
+    $DIR/amplicon/check_read_one_position_filter.py -i tmp4.bam -o $OUTPUT_BAM -s $SUMMARISE_MAPPING
+else
+    cp tmp4.bam $OUTPUT_BAM    
+#echo ${SAMPLE_TYPE}
+    #echo "HEREHREH"
+fi
+
+
 samtools index $OUTPUT_BAM

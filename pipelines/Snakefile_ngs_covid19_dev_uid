@@ -8,7 +8,7 @@ CONFIGFILE= workflow.current_basedir + "/defaults.yaml"
 
 wildcard_constraints: 
     sample="(?!merged)([a-z0-9A-Z-_]+)",
-    intervals="(?!merged)([a-z0-9A-Z-_]+)",
+    intervals="(?!phylo)([a-z0-9A-Z-_]+)",
     depth="(?!merged)([a-z0-9A-Z-_]+)",
     uid_lib="(?!merged)([a-z0-9A-Z-_]+)"
 import configparser

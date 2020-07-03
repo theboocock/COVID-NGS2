@@ -20,11 +20,11 @@ PATHS:
     OPOOL_FILE: !BASE_PIPELINE!/ref/amplicon/COVID_384rtPrimers.srt.bed
     ARCTIC_FILE: !BASE_PIPELINE!/ref/amplicon/nCoV-2019.tsv
     BCL2FASTQ: !BASE_PIPELINE!/software/bcl2fastq/bcl2fastq
-    SITES_TO_MASK: !BASE_PIPELINE!/ref/sites_to_mask/sites_to_mask.bed
+    SITES_TO_MASK: !BASE_PIPELINE!/ref/sites_to_mask/mask_problematic.bed
     ALL_PRIMERS: !BASE_PIPELINE!/ref/amplicon/all_primers_june24.bed
 PARAMS:
     HAPLOTYPE_CORES: 1
-    MIN_QUAL: 100
+    MIN_QUAL: 30 
     MIN_DEPTH: 5
     FRAC_STRAND:  10
     SARS_GENOME_NAME: sars2
