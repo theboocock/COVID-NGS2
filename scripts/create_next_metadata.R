@@ -16,12 +16,20 @@ sample_in = read.table(file_in,header=F, stringsAsFactors=F, colClasses=rep("cha
 
 ### TODO: check these arguments to ensure everything matches up
 clin_in = read.csv(args[3], header=T)
-clin_in$ID= toupper(clin_in$ID)
-clin_in$ID. = NULL
-uid = str_extract(clin_in$ID,"U[0-9]+")
-uid = str_replace_all(uid,"U","")
-uids = sprintf("U%04i",as.numeric(uid))
-clin_in$ID = uids
+print(head(clin_in))
+print(class(clin_in))
+if ("ID" %in% colnames(clin_in)){
+    print(colnames(clin_id))
+    clin_in$ID= toupper(clin_in$ID)
+    clin_in$ID. = NULL
+    uid = str_extract(clin_in$ID,"U[0-9]+")
+    uid = str_replace_all(uid,"U","")
+    uids = sprintf("U%04i",as.numeric(uid))
+    clin_in$ID = uids
+}else{
+    print("HERE")
+    clin_in$ID = clin_in$uid
+}
 sample_type = args[4] 
 sample_sheet = args[5]
 
@@ -60,5 +68,8 @@ if(!is.na(sample_sheet)){
     oligos_used = unlist(lapply(str_split(oligos_used,"\\|"), function(x) { paste(x, collapse=",")}))
     df_merged$uid = df_merged$uid.x
     df_merged$oligos_used = oligos_used
+    if ("library_type" %in% colnames(df_merged)){
+            df_merged$sample_type = df_merged$library_type
+    }
 }
 write.table(df_merged, file=args[2], quote=F, row.names=F, sep="\t") 

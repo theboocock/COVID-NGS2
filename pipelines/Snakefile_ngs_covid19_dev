@@ -90,6 +90,7 @@ except KeyError:
 rule all:
     input:
         expand("outputs/mapping_stats/bam_subset/merged/{uid_lib}.bam", uid_lib=mapped_uid.keys()),
+        #expand("outputs/mapping_stats/md/merged/{uid_lib}.bam", uid_lib=mapped_uid.keys()),
         #expand("outputs/kraken2/{sample}.kraken_report.txt",sample=samples),
         expand("outputs/consensus/merged/{intervals}/all_{depth}.fasta", depth=depth_range, intervals=intervals),
         expand("outputs/abundances/merged/{sample}.bracken", sample=mapped_uid.keys()), 

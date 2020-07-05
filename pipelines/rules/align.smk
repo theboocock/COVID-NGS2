@@ -352,7 +352,7 @@ rule picard_mark_duplicates2:
         sample_type=get_sample_type
     run:
         if "neb" in params.sample_type: 
-            run("{SCRIPTS_DIR}/picard_md.sh {params.tmpdir} {PICARD_PATH} {input.bam_in} {output.bam_out} {output.metrics_out} {log}")
+            shell("{SCRIPTS_DIR}/picard_md.sh {params.tmpdir} {PICARD_PATH} {input.bam_in} {output.bam_out} {output.metrics_out} {log}")
         else:
             shell("touch {output.metrics_out}")
             os.symlink(os.path.abspath(input.bam_in), output.bam_out)
@@ -412,6 +412,30 @@ def get_all_uid_bam(wildcards):
     #run:
         ## create new read_group  ###
         ## copy new read group to merged bams ## 
+
+def get_all_uid_raw_bams(wildcards):
+    samples = expand("outputs/mapping_stats/md/{sample}.bam", sample=mapped_uid[wildcards.sample])
+    return(samples)
+
+rule merged_raw_bams:
+    shadow: "minimal"
+    group: "aiign"
+    input:
+        bam="outputs/mapping_stats/md/merged/{sample}.bam",
+        bai="outputs/mapping_stats/md/merged/{sample}.bam.bai"
+        #bam="outputs/mapping_stats/bam_subset/merged/{intervals}/{sample}.bam",
+        #bai="outputs/md/merged/{intervals}/{sample}.bam.bai"
+    params:
+        rg=get_sample_name_for_merge    
+    run:
+        if len(input.bams) != 1:
+            # Skip merge
+            shell("samtools merge tmp.bam {input.bams} && samtools sort tmp.bam > sorted.bam")
+            shell("java -jar {PICARD_PATH} AddOrReplaceReadGroups I=sorted.bam O={output.bam} RGID=1 RGSM={params.rg} RGLB=4 RGPL=ILLUMINA RGPU=unit1")
+        else:
+            shell("java -jar {PICARD_PATH} AddOrReplaceReadGroups I={input.bams} O={output.bam} RGID=1 RGSM={params.rg} RGLB=4 RGPL=ILLUMINA RGPU=unit1")
+        shell("samtools index {output}")
+
 
 rule merged_bams:
     shadow: "minimal"

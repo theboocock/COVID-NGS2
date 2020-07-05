@@ -31,6 +31,7 @@ samtools view -h tmp2.bam | awk 'BEGIN{OFS="\t"} {if(($7 == "=" || $0 ~ "@") && 
 
 DIR=$(dirname $0)
 if [[ "${SAMPLE_TYPE}" =~ amp ]]; then
+    echo $DIR/amplicon/check_read_one_position_filter.py -i tmp4.bam -o $OUTPUT_BAM -s $SUMMARISE_MAPPING
     $DIR/amplicon/check_read_one_position_filter.py -i tmp4.bam -o $OUTPUT_BAM -s $SUMMARISE_MAPPING
 else
     cp tmp4.bam $OUTPUT_BAM    

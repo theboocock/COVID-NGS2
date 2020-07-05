@@ -22,7 +22,7 @@
 import pysam
 import argparse
 
-def filter_reads(bams, output_bam, summary_file):
+def filter_reads(bams, output_bam, summary_file, arctic_input):
     """
         Filter reads
     """
@@ -42,11 +42,8 @@ def filter_reads(bams, output_bam, summary_file):
                 last_read = current_read 
                 first = False
             if current_read != last_read:
+
                 if read_one:
-                    if "nCoV" in tmp_read1.query_name:
-                        out_bam.write(tmp_read1)
-                        if read_two:
-                            out_bam.write(tmp_read2)
                     start = int(tmp_read1.query_name.split("_")[1])
                     position = tmp_read1.reference_end
                     if position != None:
@@ -75,17 +72,26 @@ def filter_reads(bams, output_bam, summary_file):
     out_bam.close()
     pysam.sort("-o",output_bam, "test1.bam")
 
+def load_bed(arctic_bed):
+    """
+        Load arctic_bed_file
+    """
 
+    with open(arctic_bed) as in_f:
+        for line in in_f:
+            print(line)
 def main():
     parser = argparse.ArgumentParser(description="Read lines")
     parser.add_argument("-i","--input-bam",dest="bam",help="Bam input")
     parser.add_argument("-o","--output-bam",dest="output_bam",help="BAM output")
     parser.add_argument("-s","--summary",dest="summary_file",help="summary")
+    parser.add_argument("-a","--arctic-bed",dest="arctic_bed",help="Arctic bed file")
     args = parser.parse_args()
     bams = args.bam
     out_bam = args.output_bam
     summary_file = args.summary_file
-    filter_reads(bams, out_bam,summary_file)
+    arctic_bed = load_bed(args.arctic_bed)
+    filter_reads(bams, out_bam,summary_file,arctic_bed)
 
 if __name__ == "__main__":
     main()

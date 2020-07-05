@@ -88,9 +88,9 @@ def run_bcl2fastq(sample_sheet_neb, sample_sheet_amp):
     """
         run bcl2fastq
     """
-    neb_cmd = __bcl_to_fastq__.format(run_folder="neb",sample_sheet=sample_sheet_neb, barcode_mismatches=1)
+    neb_cmd = __bcl_to_fastq__.format(run_folder=".",sample_sheet=sample_sheet_neb, barcode_mismatches=1)
     subprocess.check_call(neb_cmd, shell=True)
-    amp_cmd = __bcl_to_fastq__.format(run_folder="amp",sample_sheet=sample_sheet_amp, barcode_mismatches=0)
+    amp_cmd = __bcl_to_fastq__.format(run_folder=".",sample_sheet=sample_sheet_amp, barcode_mismatches=0)
     subprocess.check_call(amp_cmd, shell=True)
 
 def main():

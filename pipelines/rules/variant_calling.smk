@@ -327,7 +327,7 @@ rule get_consensus:
     input:
         interval=  "outputs/bcftools_vcfs/filt/{intervals}/{sample}.snps.vcf.gz",
         bam="outputs/mapping_stats/bam_subset/{sample}.bam",
-        coverage="outputs/coverage/{intervals}/sars2/{sample}.cov"
+        coverage="outputs/coverage/{intervals}/{sample}.cov"
     output:
         fasta="outputs/consensus/{intervals}/{depth}/{sample}.fasta",
         coverage="outputs/consensus/{intervals}/{depth}/{sample}.cov",

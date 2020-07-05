@@ -72,10 +72,8 @@ trimReadsAmp=function(    #read1
 															max.mismatch = 1, 
 															follow.index = T, 
 															with.indels = F)
-                  print(length(cread1))
 				  to.keep=!is.na(m1)
 				  ### Let's seee if we can filter the reads
-                  print(sum(to.keep))
 				  cread1s=cread1[to.keep]
 				  q1s=q1[to.keep]
 				  m1k=m1[to.keep]
@@ -112,7 +110,6 @@ trimReadsAmp=function(    #read1
 				  #dump reads where read2 is  polyG
 				  r2.to.keep=vcountPattern(polyG, r2.trimmed)==0
 				  #could comment out next 2 lines, mostly for debugging
-                  print(oname)
 				  #print('polyG')
 				  #print(sum(!r2.to.keep))
 				  umi1=umi1[r2.to.keep]
@@ -129,7 +126,6 @@ trimReadsAmp=function(    #read1
 				  #print(oname)
 				  #print(nrow(bdf))
 				  #print(sum(bdf$count))
-				  print(length(r1.trimmed)) 
 				  if(length(r1.trimmed)>0){
 				  cname=xscat(BStringSet(rep(oname,length(r1.trimmed))), ':', BStringSet(1:length(r1.trimmed)), ':', BStringSet(umi1), ':', BStringSet(umi2))
 				  writeFastq( ShortReadQ(sread=r1.trimmed, quality=q1.trimmed,  id= cname),  file=out.file1, mode='a', full=FALSE, compress=TRUE)
