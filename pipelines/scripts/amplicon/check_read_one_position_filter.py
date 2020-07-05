@@ -50,8 +50,8 @@ def filter_reads(bams, output_bam, summary_file,arctic_hash):
                         arctic_match_end = (arctic_hash[read_short][1])
                         position = tmp_read1.reference_end
                         if position is not None:
-                            print(position)
-                            print(arctic_match_end + 6)
+                            #print(position)
+                            #print(arctic_match_end + 6)
                             if position == (arctic_match_end + 6):
                                 out_bam.write(tmp_read1)
                                 if read_two:
