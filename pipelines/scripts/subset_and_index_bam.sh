@@ -17,6 +17,7 @@ PICARD=$6
 TMP=$7
 SAMPLE_TYPE=$8
 SUMMARISE_MAPPING=$9
+ARCTIC_LOCATIONS=${10}
 echo $SAMPLE_TYPE
 touch $SUMMARISE_MAPPING
 touch $LOG
@@ -27,12 +28,16 @@ cat top.tmp bot.tmp > header.tmp
 samtools view  -q $MAPQ_FILT $INPUT_BAM $CONTIG > tmp.sam  2> /dev/null
 cat header.tmp tmp.sam  | samtools view -hbS > tmp2.bam  2> /dev/null
 
+### both reads must map to the same genome ## 
+
+### So if read2 maps to human sars2 must map to non-humann ### 
+
 samtools view -h tmp2.bam | awk 'BEGIN{OFS="\t"} {if(($7 == "=" || $0 ~ "@") && $7 != "*" ){print $0}}' |  samtools view -hb > tmp4.bam 2> /dev/null
 
 DIR=$(dirname $0)
 if [[ "${SAMPLE_TYPE}" =~ amp ]]; then
     echo $DIR/amplicon/check_read_one_position_filter.py -i tmp4.bam -o $OUTPUT_BAM -s $SUMMARISE_MAPPING
-    $DIR/amplicon/check_read_one_position_filter.py -i tmp4.bam -o $OUTPUT_BAM -s $SUMMARISE_MAPPING
+    $DIR/amplicon/check_read_one_position_filter.py -i tmp4.bam -o $OUTPUT_BAM -s $SUMMARISE_MAPPING -a $ARCTIC_LOCATIONS
 else
     cp tmp4.bam $OUTPUT_BAM    
 #echo ${SAMPLE_TYPE}

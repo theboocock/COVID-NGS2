@@ -45,6 +45,8 @@ TRIMMOMATIC_PATH=config["PATHS"]["TRIMMOMATIC_PATH"]
 
 BRACKEN_PATH=config["PATHS"]["BRACKEN_PATH"]
 
+ARCTIC_LOCATIONS=config["PATHS"]["ARCTIC_LOCATIONS"]
+
 #intervals=list(input_fasta.keys())
 #intervals = [interval.strip().replace(" ","_").replace(",","") for interval in intervals]
 
@@ -68,6 +70,9 @@ try:
         mapped_uid, sample_names_hash, mapped_uids_read_one, mapped_uids_read_two = uid_library_to_sample_name() 
     elif config["merge_rule"] == "uid_oligo":
         mapped_uid, sample_names_hash, mapped_uids_read_one, mapped_uids_read_two = uid_library_to_sample_hash(merge_rule="uid_oligo") 
+    elif config["merge_rule"] == "column_uid_sample_type":
+        mapped_uid, sample_names_hash, mapped_uids_read_one, mapped_uids_read_two = uid_library_to_sample_hash(merge_rule="column_uid_sample_type") 
+
 except KeyError:
     mapped_uid, sample_names_hash, mapped_uids_read_one, mapped_uids_read_two = uid_library_to_sample_name_and_readgroup()
     pass
@@ -90,7 +95,7 @@ except KeyError:
 rule all:
     input:
         expand("outputs/mapping_stats/bam_subset/merged/{uid_lib}.bam", uid_lib=mapped_uid.keys()),
-        #expand("outputs/mapping_stats/md/merged/{uid_lib}.bam", uid_lib=mapped_uid.keys()),
+        expand("outputs/mapping_stats/md/merged/{uid_lib}.bam", uid_lib=mapped_uid.keys()),
         #expand("outputs/kraken2/{sample}.kraken_report.txt",sample=samples),
         expand("outputs/consensus/merged/{intervals}/all_{depth}.fasta", depth=depth_range, intervals=intervals),
         expand("outputs/abundances/merged/{sample}.bracken", sample=mapped_uid.keys()), 

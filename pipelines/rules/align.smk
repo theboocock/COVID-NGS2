@@ -393,7 +393,7 @@ rule extract_reads_mapping_to_sars2:
         rg="@RG\\tID:{sample}\\tSM:{sample}\\tPL:illumina\\tLB:lib1\\tPU:unit1",
         sample_type=get_sample_type
     shell:
-        "{SCRIPTS_DIR}/subset_and_index_bam.sh  {input.bam} {output.bam} sars2 {MAPQ_FILT} {log} {PICARD_PATH} {params.tmpdir} {params.sample_type} {output.summarise_mapping}"
+        "{SCRIPTS_DIR}/subset_and_index_bam.sh  {input.bam} {output.bam} sars2 {MAPQ_FILT} {log} {PICARD_PATH} {params.tmpdir} {params.sample_type} {output.summarise_mapping} {ARCTIC_LOCATIONS}"
 
 
 
@@ -414,13 +414,15 @@ def get_all_uid_bam(wildcards):
         ## copy new read group to merged bams ## 
 
 def get_all_uid_raw_bams(wildcards):
-    samples = expand("outputs/mapping_stats/md/{sample}.bam", sample=mapped_uid[wildcards.sample])
+    samples = expand("outputs/mapping_stats/md/{sample}.sorted.md.bam", sample=mapped_uid[wildcards.sample])
     return(samples)
 
 rule merged_raw_bams:
     shadow: "minimal"
     group: "aiign"
     input:
+        bams=get_all_uid_raw_bams
+    output:
         bam="outputs/mapping_stats/md/merged/{sample}.bam",
         bai="outputs/mapping_stats/md/merged/{sample}.bam.bai"
         #bam="outputs/mapping_stats/bam_subset/merged/{intervals}/{sample}.bam",
@@ -457,6 +459,7 @@ rule merged_bams:
         else:
             shell("java -jar {PICARD_PATH} AddOrReplaceReadGroups I={input.bams} O={output.bam} RGID=1 RGSM={params.rg} RGLB=4 RGPL=ILLUMINA RGPU=unit1")
         shell("samtools index {output}")
+
 #rule trim_reads:
 #    shadow: "minimal"
 #    output:

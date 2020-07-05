@@ -145,8 +145,9 @@ rule calculate_mapping_statistics:
     """
     group: "qc_sample"
     input:
-        bam=temp("outputs/mapping_stats/md/{sample}.sorted.md.bam"),
-        bai=temp("outputs/mapping_stats/md/{sample}.sorted.md.bam.bai")
+        bam=("outputs/mapping_stats/md/{sample}.sorted.md.bam"),
+        bai=("outputs/mapping_stats/md/{sample}.sorted.md.bam.bai"),
+        bam_subset="outputs/mapping_stats/bam_subset/{sample}.bam"
     output:
         "outputs/mapping_stats/{sample}.mapstat"
     log:
@@ -154,7 +155,7 @@ rule calculate_mapping_statistics:
     params:
         tmpdir="-Djava.io.tmpdir=tmpdir"
     shell:
-        "{SCRIPTS_DIR}/calculate_mapping_statistics.py -b {input.bam} -c {CONFIGFILE}  -o {output}"
+        "{SCRIPTS_DIR}/calculate_mapping_statistics.py -b {input.bam} -c {CONFIGFILE}  -o {output} --bam-subset {input.bam_subset}"
 
 rule qc_output:
     """

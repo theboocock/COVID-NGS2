@@ -27,7 +27,7 @@ import yaml
 samtools view -c -b $INFILE -L | samtools view -c > ${INFILE}_human_count.txt
 samtools view -s $FRAC -b $INFILE -L hg38_rRNA.bed |samtools view -c > ${INFILE}_rrna_count.txt
 samtools view -s $FRAC -b $INFILE sars2 | samtools view -c > ${INFILE}_sars2_count.txt
-samtools view -f 4 -s $FRAC -c $INFILE > ${INFILE}_unmapped_count.txt
+samtools view  4 -s $FRAC -c $INFILE > ${INFILE}_unmapped_count.txt
 """
 
 SAMTOOLS_REGION_COUNT= """
@@ -46,7 +46,7 @@ def _load_cfg(config_file):
         data = yaml.load(in_f)
     return(data)
 
-def calculate_alignment_statistics(bam_in, config, output):
+def calculate_alignment_statistics(bam_in, config, output,bam_subset):
     """
         Calculate alignment statistics 
     """
@@ -58,7 +58,7 @@ def calculate_alignment_statistics(bam_in, config, output):
     count_one = int(subprocess.check_output(sam_cmd, shell=True).strip())
     sam_cmd  = SAMTOOLS_REGION_COUNT.format(bam_in=bam_in, region_in=rrna_hg38)
     count_two= int(subprocess.check_output(sam_cmd, shell=True).strip())
-    sam_cmd  = SAMTOOLS_ONE_REGION_COUNT.format(bam_in=bam_in, region_in=sars_genome_name)
+    sam_cmd  = SAMTOOLS_ONE_REGION_COUNT.format(bam_in=bam_subset, region_in=sars_genome_name)
     count_three = int(subprocess.check_output(sam_cmd, shell=True).strip())
     sam_cmd  = SAMTOOLS_UNMAPPED_COUNT.format(bam_in=bam_in) 
     count_four = int(subprocess.check_output(sam_cmd, shell=True).strip())
@@ -69,12 +69,14 @@ def calculate_alignment_statistics(bam_in, config, output):
 def main():
     parser = argparse.ArgumentParser(description="Calculate COVID19 mapping statistics")
     parser.add_argument("-b","--bam-in", dest="bam_input", required=True)
+    parser.add_argument("--bam-subset",dest="bam_subset", required=True)
     parser.add_argument("-c","--config-file",dest="config_file", required=True)
     parser.add_argument("-o","--output-file",dest="output_file", required=True)
     
     args = parser.parse_args() 
     print(args.config_file)
+    bam_subset = args.bam_subset 
     config = _load_cfg(args.config_file)
-    calculate_alignment_statistics(args.bam_input, config, args.output_file)
+    calculate_alignment_statistics(args.bam_input, config, args.output_file, bam_subset)
 if __name__=="__main__":
     main()

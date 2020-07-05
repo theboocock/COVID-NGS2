@@ -22,6 +22,7 @@ PATHS:
     BCL2FASTQ: !BASE_PIPELINE!/software/bcl2fastq/bcl2fastq
     SITES_TO_MASK: !BASE_PIPELINE!/ref/sites_to_mask/mask_problematic.bed
     ALL_PRIMERS: !BASE_PIPELINE!/ref/amplicon/all_primers_june24.bed
+    ARCTIC_LOCATIONS: !BASE_PIPELINE!/ref/amplicon/arctic_positions.bed
 PARAMS:
     HAPLOTYPE_CORES: 1
     MIN_QUAL: 30 
