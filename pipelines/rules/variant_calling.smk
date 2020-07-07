@@ -85,6 +85,14 @@ rule create_quasi_species_vcf:
     shell:
         "{SCRIPTS_DIR}/vcf_filter/allelic_balance.py --vcf {input} -o {output}"
 
+rule create_merged_quasi_species_vcf:
+    group: "vcf_output"
+    input:
+        "outputs/bcftools_vcfs/merged/filt/sars2/all.vcf.gz"
+    output:
+        "outputs/quasi_species/merged/all.vcf"
+    shell:
+        "{SCRIPTS_DIR}/vcf_filter/allelic_balance.py --vcf {input} -o {output}"
 
 
 rule convert_annovar_to_table:
@@ -200,7 +208,8 @@ rule combine_filtered_vcf:
     output:
         "outputs/bcftools_vcfs/merged/filt/sars2/all.vcf.gz"
     shell:
-        "bcftools merge {input.vcfs} | bcftools view -v snps,indels | bedtools intersect -v -a stdin -b {SITES_TO_MASK} -header | bgzip -c > {output} &&  tabix -p vcf {output}"
+        #"bcftools merge {input.vcfs} | bcftools view -v snps,indels | bedtools intersect -v -a stdin -b {SITES_TO_MASK} -header | bgzip -c > {output} &&  tabix -p vcf {output}"
+        "bcftools merge {input.vcfs} | bcftools view -v snps,indels | bgzip -c > {output} &&  tabix -p vcf {output}"
 
 
 rule annovar_vcf:
@@ -279,7 +288,9 @@ rule get_consensus_from_merged:
     shadow: "minimal"
     group: "vcf_output"
     input:
-        interval = "outputs/bcftools_vcfs/merged/filt/{intervals}/{sample}.snps.vcf.gz",
+        interval = "outputs/bcftools_vcfs/merged/filt/{intervals}/{sample}.snps_and_indels.vcf.gz",
+
+        quasi_in= "outputs/final/merged/quasi_species/all.vcf",
         bam="outputs/mapping_stats/bam_subset/merged/{sample}.bam",
         coverage="outputs/coverage/merged/sars2/{sample}.cov"
     output:
@@ -289,8 +300,8 @@ rule get_consensus_from_merged:
     params:
         sample=get_sample_name_for_merge
     run:
-        shell("{SCRIPTS_DIR}/generate_consensus.py  --coverage-in {input.coverage} -v {input.interval} -d {wildcards.depth} -p 1.0 -o {output.fasta_phylo} -c /dev/null -r {SARS_REF}        -i {input.bam} -s {params.sample} -m {SITES_TO_MASK}")
-        shell("{SCRIPTS_DIR}/generate_consensus.py  --coverage-in {input.coverage} -v {input.interval} -d {wildcards.depth} -p 1.0 -o {output.fasta} -c {output.coverage} -r {SARS_REF}        -i {input.bam} -s {params.sample}")
+        shell("{SCRIPTS_DIR}/generate_consensus.py  --coverage-in {input.coverage} -v {input.interval} -d {wildcards.depth} -p 1.0 -o {output.fasta_phylo} -c /dev/null -r {SARS_REF}        -i {input.bam} -s {params.sample} -m {SITES_TO_MASK} --quasi-vcf {input.quasi_in}")
+        shell("{SCRIPTS_DIR}/generate_consensus.py  --coverage-in {input.coverage} -v {input.interval} -d {wildcards.depth} -p 1.0 -o {output.fasta} -c {output.coverage} -r {SARS_REF}        -i {input.bam} -s {params.sample} --quasi-vcf {input.quasi_in}")
 
 
 rule aggregate_consensus:
@@ -325,7 +336,7 @@ rule get_consensus:
     shadow: "minimal"
     group: "vcf_output"
     input:
-        interval=  "outputs/bcftools_vcfs/filt/{intervals}/{sample}.snps.vcf.gz",
+        interval=  "outputs/bcftools_vcfs/filt/{intervals}/{sample}.snps_and_indels.vcf.gz",
         bam="outputs/mapping_stats/bam_subset/{sample}.bam",
         coverage="outputs/coverage/{intervals}/{sample}.cov"
     output:
@@ -335,8 +346,8 @@ rule get_consensus:
     params:
         sample=get_sample_name
     run:
-        shell("{SCRIPTS_DIR}/generate_consensus.py  --coverage-in {input.coverage} -v {input.interval} -d {wildcards.depth} -p 1.0 -o {output.fasta_phylo} -c /dev/null -r {SARS_REF}        -i {input.bam} -s {params.sample} -m {SITES_TO_MASK}")
-        shell("{SCRIPTS_DIR}/generate_consensus.py  --coverage-in {input.coverage} -v {input.interval} -d {wildcards.depth} -p 1.0 -o {output.fasta} -c {output.coverage} -r {SARS_REF}        -i {input.bam} -s {params.sample}")
+        shell("{SCRIPTS_DIR}/generate_consensus.py  --coverage-in {input.coverage} -v {input.interval} -d {wildcards.depth} -p 1.0 -o {output.fasta_phylo} -c /dev/null -r {SARS_REF}        -i {input.bam} -s {params.sample} -m {SITES_TO_MASK} --quasi_vcf {input.interval}")
+        shell("{SCRIPTS_DIR}/generate_consensus.py  --coverage-in {input.coverage} -v {input.interval} -d {wildcards.depth} -p 1.0 -o {output.fasta} -c {output.coverage} -r {SARS_REF}        -i {input.bam} -s {params.sample} --quasi_vcf {input.interval}")
         
 
 rule map_consensus_to_genome:

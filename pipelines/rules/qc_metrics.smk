@@ -176,8 +176,7 @@ rule qc_output:
 
 rule amplicon_qc_output:
     input:
-        bam="outputs/mapping_stats/bam_subset/{sample}.bam",
-        bai="outputs/mapping_stats/bam_subset/{sample}.bam.bai"
+        bam="outputs/mapping_stats/bam_subset/{sample}.amplicon.bam"
     output:
         temp("outputs/amplicon_qc/{sample}.check_run"),
     params:

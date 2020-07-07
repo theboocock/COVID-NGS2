@@ -74,7 +74,6 @@ def main():
     parser.add_argument("-o","--output-file",dest="output_file", required=True)
     
     args = parser.parse_args() 
-    print(args.config_file)
     bam_subset = args.bam_subset 
     config = _load_cfg(args.config_file)
     calculate_alignment_statistics(args.bam_input, config, args.output_file, bam_subset)

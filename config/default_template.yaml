@@ -30,6 +30,7 @@ PARAMS:
     FRAC_STRAND:  10
     SARS_GENOME_NAME: sars2
     MAPQ_FILT: 20
+    MIN_COV: 0.8
 
 
 

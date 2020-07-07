@@ -45,12 +45,11 @@ trimReadsAmp=function(    #read1
                     ){
     fi1 = FastqStreamer(in.file1, nbuffer, readerBlockSize = 1e9, verbose = T)
     fi2 = FastqStreamer(in.file2, nbuffer, readerBlockSize = 1e9, verbose = T)
-
-    
+    idx_iter = 0
     repeat {
+        idx_iter= idx_iter + 1 
         rfq1 <- yield(fi1) 
         rfq2 <- yield(fi2) 
-      
          if(length(rfq1) == 0 ) { break }
                             
         cread1 = sread(rfq1)
@@ -127,7 +126,7 @@ trimReadsAmp=function(    #read1
 				  #print(nrow(bdf))
 				  #print(sum(bdf$count))
 				  if(length(r1.trimmed)>0){
-				  cname=xscat(BStringSet(rep(oname,length(r1.trimmed))), ':', BStringSet(1:length(r1.trimmed)), ':', BStringSet(umi1), ':', BStringSet(umi2))
+				  cname=xscat(BStringSet(rep(oname,length(r1.trimmed))), ':', BStringSet(1:length(r1.trimmed)), ':', BStringSet(umi1), ':', BStringSet(umi2),":",BStringSet(rep(idx_iter,length(r1.trimmed))))
 				  writeFastq( ShortReadQ(sread=r1.trimmed, quality=q1.trimmed,  id= cname),  file=out.file1, mode='a', full=FALSE, compress=TRUE)
 				  writeFastq( ShortReadQ(sread=r2.trimmed, quality=q2.trimmed, id= cname),  file=out.file2, mode='a', full=FALSE, compress=TRUE)
               }
@@ -173,7 +172,10 @@ trimReadsArctic=function(    #read1
                     ){
     fi1 = FastqStreamer(in.file1, nbuffer, readerBlockSize = 1e9, verbose = T)
     fi2 = FastqStreamer(in.file2, nbuffer, readerBlockSize = 1e9, verbose = T)
+    idx_iter = 0
       repeat {
+        idx_iter = idx_iter + 1
+
         rfq1 <- yield(fi1) 
         rfq2 <- yield(fi2) 
       
@@ -247,7 +249,7 @@ trimReadsArctic=function(    #read1
               #print(sum(bdf$count))
               
               if(length(r1.trimmed)>0){
-              cname=xscat(BStringSet(rep(oname,length(r1.trimmed))), ':', BStringSet(1:length(r1.trimmed)), ':', BStringSet(umi1), ':', BStringSet(umi2))
+	          cname=xscat(BStringSet(rep(oname,length(r1.trimmed))), ':', BStringSet(1:length(r1.trimmed)), ':', BStringSet(umi1), ':', BStringSet(umi2),":",BStringSet(rep(idx_iter,length(r1.trimmed))))
               writeFastq( ShortReadQ(sread=r1.trimmed, quality=q1.trimmed,  id= cname),  file=out.file1, mode='a', full=FALSE, compress=TRUE)
               writeFastq( ShortReadQ(sread=r2.trimmed, quality=q2.trimmed, id= cname),  file=out.file2, mode='a', full=FALSE, compress=TRUE)
               }
@@ -356,6 +358,7 @@ if (type == "arctic"){
         oPool.primers.table = oPool.primers.table[which(oPool.primers.table[,3] %in% y),]
         oPool.primers.table = oPool.primers.table[!duplicated(oPool.primers.table[,2]),]
         oPool.primers.arctic = DNAStringSet(oPool.primers.table[,2])
+        write.table(oPool.primers.table, file="out1.txt", quote=F,row.names=F,col.names=T)
         primers.arctic = data.frame(seq=oPool.primers.table[,2],name=oPool.primers.table[,1],length=sapply(oPool.primers.table[,2],nchar))
         primers.arctic = split(primers.arctic,primers.arctic$name)
         trimReadsArctic(#read1

@@ -46,20 +46,22 @@ TRIMMOMATIC_PATH=config["PATHS"]["TRIMMOMATIC_PATH"]
 BRACKEN_PATH=config["PATHS"]["BRACKEN_PATH"]
 
 ARCTIC_LOCATIONS=config["PATHS"]["ARCTIC_LOCATIONS"]
-
+## TODO: ADD MIN_COV
+#
+#MIN_COVERAGE=config["PARAMS"]["MIN_COV"]
 #intervals=list(input_fasta.keys())
 #intervals = [interval.strip().replace(" ","_").replace(",","") for interval in intervals]
 
 include: "rules/utils.smk"
 
-depth_range = [5]
-min_cov = 0.9
+depth_range = [3]
+min_cov = 0.8
 
 taxon_dict = read_taxid(TAXON_IN)
 metadata=fastq_match(config)
 #type_uid 
+#metadata = metadata[metadata["sample"].isin([72,83,107,131,367])]
 samples=metadata["sample"]
-rg_name=metadata["strain"]
 # uid type merges libraries across samples
 try:
     if config["merge_rule"] == "uid_type": 
@@ -92,6 +94,7 @@ except KeyError:
 #rule all:
 #    input:
 #        expand("outputs/kraken2/{sample}.kraken_report.txt",sample=samples)
+#
 rule all:
     input:
         expand("outputs/mapping_stats/bam_subset/merged/{uid_lib}.bam", uid_lib=mapped_uid.keys()),
@@ -102,6 +105,8 @@ rule all:
         expand("outputs/coverage/merged/coverage_plots/{intervals}/{sample}.png", intervals=intervals, sample=mapped_uid.keys()), 
         "outputs/ncov/merged/all.fasta",
         "outputs/bcftools_vcfs/merged/all.vcf.gz",
+        "outputs/quasi_species/merged/all.vcf",
+        expand("outputs/raw_fastqs/{sample}.R1.fastq.gz",sample=samples),
        # TODO check if it works#
       #"test.png",
         expand("outputs/coverage/coverage_plots/{intervals}/{sample}.png", intervals=intervals, sample=samples), 

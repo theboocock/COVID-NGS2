@@ -6,6 +6,16 @@ import os
 
 
 
+rule raw_fastqs:
+    input:
+        read_one=get_fq1,
+        read_two=get_fq2
+    output:
+        out_fastq_one="outputs/raw_fastqs/{sample}.R1.fastq.gz",
+        out_fastq_two="outputs/raw_fastqs/{sample}.R2.fastq.gz"
+    shell:
+        "cp {input.read_one} {output.out_fastq_one} && cp {input.read_two} {output.out_fastq_two}"
+
 rule count_reads:
     input:
         read_one=get_fq1,
@@ -384,16 +394,17 @@ rule extract_reads_mapping_to_sars2:
     output:
         bam="outputs/mapping_stats/bam_subset/{sample}.bam",
         bai="outputs/mapping_stats/bam_subset/{sample}.bam.bai",
+        bam_amplicon="outputs/mapping_stats/bam_subset/{sample}.amplicon.bam",
         summarise_mapping="outputs/mapping_stats/bam_subset/{sample}.summary"
     log:
         "logs/extract_mapping_sars2/{sample}.log"
     params:
         tmpdir="-Djava.io.tmpdir=tmpdir",
         cluster="-l h_rt=24:00:00 -l h_data=16G -cwd",
-        rg="@RG\\tID:{sample}\\tSM:{sample}\\tPL:illumina\\tLB:lib1\\tPU:unit1",
+        rg=get_rg,
         sample_type=get_sample_type
     shell:
-        "{SCRIPTS_DIR}/subset_and_index_bam.sh  {input.bam} {output.bam} sars2 {MAPQ_FILT} {log} {PICARD_PATH} {params.tmpdir} {params.sample_type} {output.summarise_mapping} {ARCTIC_LOCATIONS}"
+        "{SCRIPTS_DIR}/subset_and_index_bam.sh  {input.bam} {output.bam} sars2 {MAPQ_FILT} {log} {PICARD_PATH} {params.tmpdir} {params.sample_type} {output.summarise_mapping} {ARCTIC_LOCATIONS} '{params.rg}' {SARS_REF} {output.bam_amplicon}"
 
 
 

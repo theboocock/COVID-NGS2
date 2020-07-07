@@ -16,7 +16,7 @@ def uid_library_to_sample_name():
     mapped_uids_read_one = {}
     mapped_uids_read_two = {}
     start_id = 1  
-    print(len(unique_id_library_type))
+    #print(len(unique_id_library_type))
     for uid_name in unique_id_library_type: 
         g = list((metadata["sample"][metadata["id_library_type"] == uid_name]))
         r1 =  list((metadata["fastq_one"][metadata["id_library_type"] == uid_name]))
@@ -39,9 +39,9 @@ def uid_library_to_sample_hash(merge_rule="uid_type"):
     elif merge_rule == "uid_oligo":
         id_library_type = metadata["uid"]  + "_" + metadata["oligos_used"]
     elif merge_rule == "column_uid_sample_type":
-        print("HERE")
+        #   print("HERE")
         id_library_type = metadata["uid_sample_type"]
-    print(id_library_type)
+    #print(id_library_type)
     metadata["id_library_type"] = id_library_type
     unique_id_library_type = list(pd.unique(metadata["id_library_type"]))
     mapped_uids_library = {} 
@@ -111,7 +111,7 @@ def get_fq2(wildcards):
     return out_fastq
 
 def get_sample_name(wildcards):
-    sample_name = metadata["strain"][metadata["sample"] == int(wildcards.sample)]
+    sample_name = metadata["sample"][metadata["sample"] == int(wildcards.sample)]
     sample_name = str(sample_name).split()[1]
     return sample_name
 

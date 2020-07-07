@@ -29,7 +29,8 @@ def vcf_input_filter(vcf_file,lower, upper, vcf_outfile):
     """
     vcf_in = pysam.VariantFile(vcf_file)
     with open(vcf_outfile,"w") as out_f:
-        out_f.write(str(vcf_in.header)) 
+        vcf_in.header.add_line(""""##FORMAT=<ID=AR,Number=1,Type=Float,Description="Allelic ratio">""")
+        out_f.write(str(vcf_in.header))
         for rec in vcf_in.fetch():
             out_f.write(str(rec.chrom)+ "\t")
             out_f.write(str(rec.pos) + "\t")
