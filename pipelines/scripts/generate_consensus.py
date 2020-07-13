@@ -84,6 +84,7 @@ def get_masking_bed(bam_input, min_depth, max_strand_prop,coverage_in):
 def get_sample_vcf(vcf_gz, sample,quasi_vcf):
     ### QUASI _IN  
     sample_cmd = __BCFTOOLS_SAMPLE_TEMPLATE__.format(quasi_vcf, sample)
+    subprocess.check_call(sample_cmd,shell=True)
     het_cmd = AWK_GET_HET_POSITIONS.format("sample.vcf.gz") 
     subprocess.check_call(het_cmd,shell=True)
     

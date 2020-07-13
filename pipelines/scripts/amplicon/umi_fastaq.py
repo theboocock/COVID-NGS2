@@ -64,12 +64,13 @@ def umi_tag(bam,out_bam):
 
 sort_bam=""" fgbio SortBam -s TemplateCoordinate -i {0} -o {1}""" 
 set_mate_info=""" fgbio SetMateInformation -i {0} -o {1} """ 
-group_read_by_umi =""" fgbio GroupReadsByUmi -i {0} -o {1} -t UB -s edit --edits 2 """
+group_read_by_umi =""" fgbio GroupReadsByUmi -i {0} -o {1} -t UB -s edit --edits 0 """
 molecular_consensus=""" fgbio  CallMolecularConsensusReads -i {0} -o {1} -t MI -M 1 """  
 bam_to_fastq=""" bedtools bamtofastq -i {0} -fq {1} -fq2 {2} """ 
 quick_align="""bwa mem -t 1 -R "{0}" {1} {2} {3} | samtools sort > {4} && samtools index {4}"""
 import subprocess
-def sort_and_correct_reads(in_bam,out_bam, fastq_one, fastq_two,reference,read_group):
+import shutil
+def sort_and_correct_reads(in_bam,out_bam, fastq_one, fastq_two,reference,read_group, summarise_molecular_info):
     """
         Sort,get molecular consensus and finally call variants. 
     """
@@ -79,19 +80,22 @@ def sort_and_correct_reads(in_bam,out_bam, fastq_one, fastq_two,reference,read_g
     subprocess.check_call(set_mate_info_cmd,shell=True)
     group_read_by_umi_cmd = group_read_by_umi.format("test2.bam","test3.bam")
     subprocess.check_call(group_read_by_umi_cmd,shell=True)
+    ## TODO: damn order
+    shutil.copy("test3.bam", summarise_molecular_info)
+    #subprocess.check_call("samtools index {0}".format(summarise_molecular_info),shell=True)
     molecular_consensus_cmd = molecular_consensus.format("test3.bam","test4.bam")
     subprocess.check_call(molecular_consensus_cmd,shell=True)
     bam_to_fastq_cmd = bam_to_fastq.format("test4.bam", fastq_one,fastq_two)
     subprocess.check_call(bam_to_fastq_cmd,shell=True)
     ## ADD BACK READ GROUP
     quick_align_cmd = quick_align.format(read_group, reference, fastq_one, fastq_two, out_bam) 
-    print(quick_align_cmd)
     subprocess.check_call(quick_align_cmd, shell=True)
 
 def main():
     parser = argparse.ArgumentParser(description="Generate fastq containing UMIS")
     parser.add_argument("-i","--input-bam",dest="input_bam",help="input bam")
     parser.add_argument("-o","--output-bam",dest="output_bam",help="output bam")
+    parser.add_argument("--output-summarise-molecular-info",dest="summarise_molecular_info",help="Summarise molecular info")
     parser.add_argument("--fastq-one-out",dest="fastq_one_out")
     parser.add_argument("--fastq-two-out",dest="fastq_two_out")
     parser.add_argument("--read-group", dest="read_group")
@@ -101,7 +105,7 @@ def main():
     out_bam = args.output_bam
     print(args.input_bam)
     umi_tag(args.input_bam,"test.bam")
-    sort_and_correct_reads("test.bam", args.output_bam, args.fastq_one_out,args.fastq_two_out,args.reference_genome,args.read_group)
+    sort_and_correct_reads("test.bam", args.output_bam, args.fastq_one_out,args.fastq_two_out,args.reference_genome,args.read_group,args.summarise_molecular_info)
 
 
 

@@ -395,22 +395,23 @@ rule extract_reads_mapping_to_sars2:
         bam="outputs/mapping_stats/bam_subset/{sample}.bam",
         bai="outputs/mapping_stats/bam_subset/{sample}.bam.bai",
         bam_amplicon="outputs/mapping_stats/bam_subset/{sample}.amplicon.bam",
-        summarise_mapping="outputs/mapping_stats/bam_subset/{sample}.summary"
+        bam_amplicon_bai="outputs/mapping_stats/bam_subset/{sample}.amplicon.bam.bai",
+        summarise_mapping="outputs/mapping_stats/bam_subset/{sample}.summary",
+        umi_bam="outputs/mapping_stats/bam_subset/{sample}.groupumi.bam"
     log:
         "logs/extract_mapping_sars2/{sample}.log"
+    threads:
+        4
     params:
         tmpdir="-Djava.io.tmpdir=tmpdir",
         cluster="-l h_rt=24:00:00 -l h_data=16G -cwd",
         rg=get_rg,
         sample_type=get_sample_type
     shell:
-        "{SCRIPTS_DIR}/subset_and_index_bam.sh  {input.bam} {output.bam} sars2 {MAPQ_FILT} {log} {PICARD_PATH} {params.tmpdir} {params.sample_type} {output.summarise_mapping} {ARCTIC_LOCATIONS} '{params.rg}' {SARS_REF} {output.bam_amplicon}"
+        "{SCRIPTS_DIR}/subset_and_index_bam.sh  {input.bam} {output.bam} sars2 {MAPQ_FILT} {log} {PICARD_PATH} {params.tmpdir} {params.sample_type} {output.summarise_mapping} {ARCTIC_LOCATIONS} '{params.rg}' {SARS_REF} {output.bam_amplicon} {output.umi_bam}"
 
 
 
-def get_all_uid_bam(wildcards):
-    samples = expand("outputs/mapping_stats/bam_subset/{sample}.bam", sample=mapped_uid[wildcards.sample])
-    return(samples)
 
 #rule merge_sars2_bams:
     #    shadow: "minimal"
@@ -449,17 +450,24 @@ rule merged_raw_bams:
             shell("java -jar {PICARD_PATH} AddOrReplaceReadGroups I={input.bams} O={output.bam} RGID=1 RGSM={params.rg} RGLB=4 RGPL=ILLUMINA RGPU=unit1")
         shell("samtools index {output}")
 
+def get_all_uid_bam(wildcards):
+    samples = expand("outputs/mapping_stats/bam_subset/{sample}.bam", sample=mapped_uid[wildcards.sample])
+    return(samples)
+def get_all_uid_bam_amplicon(wildcards):
+    samples = expand("outputs/mapping_stats/bam_subset/{sample}.amplicon.bam", sample=mapped_uid[wildcards.sample])
+    return(samples)
 
 rule merged_bams:
     shadow: "minimal"
     group: "align"
     input:
-        bams = get_all_uid_bam 
+        bams = get_all_uid_bam,
+        bams_amplicon= get_all_uid_bam_amplicon 
     output:
         bam="outputs/mapping_stats/bam_subset/merged/{sample}.bam",
-        bai="outputs/mapping_stats/bam_subset/merged/{sample}.bam.bai"
-        #bam="outputs/mapping_stats/bam_subset/merged/{intervals}/{sample}.bam",
-        #bai="outputs/md/merged/{intervals}/{sample}.bam.bai"
+        bai="outputs/mapping_stats/bam_subset/merged/{sample}.bam.bai",
+        bam_amplicon="outputs/mapping_stats/bam_subset/merged/{sample}.amplicon.bam",
+        bai_amplicon="outputs/mapping_stats/bam_subset/merged/{sample}.amplicon.bam.bai"
     params:
         rg=get_sample_name_for_merge    
     run:
@@ -467,9 +475,17 @@ rule merged_bams:
             # Skip merge
             shell("samtools merge tmp.bam {input.bams} && samtools sort tmp.bam > sorted.bam")
             shell("java -jar {PICARD_PATH} AddOrReplaceReadGroups I=sorted.bam O={output.bam} RGID=1 RGSM={params.rg} RGLB=4 RGPL=ILLUMINA RGPU=unit1")
+            shell("rm tmp.bam")
         else:
             shell("java -jar {PICARD_PATH} AddOrReplaceReadGroups I={input.bams} O={output.bam} RGID=1 RGSM={params.rg} RGLB=4 RGPL=ILLUMINA RGPU=unit1")
-        shell("samtools index {output}")
+        shell("samtools index {output.bam}")
+        if len(input.bams_amplicon) != 1:
+            # Skip merge
+            shell("samtools merge tmp.bam {input.bams_amplicon} && samtools sort tmp.bam > sorted.bam")
+            shell("java -jar {PICARD_PATH} AddOrReplaceReadGroups I=sorted.bam O={output.bam_amplicon} RGID=1 RGSM={params.rg} RGLB=4 RGPL=ILLUMINA RGPU=unit1")
+        else:
+            shell("java -jar {PICARD_PATH} AddOrReplaceReadGroups I={input.bams_amplicon} O={output.bam_amplicon} RGID=1 RGSM={params.rg} RGLB=4 RGPL=ILLUMINA RGPU=unit1")
+        shell("samtools index {output.bam_amplicon}")
 
 #rule trim_reads:
 #    shadow: "minimal"

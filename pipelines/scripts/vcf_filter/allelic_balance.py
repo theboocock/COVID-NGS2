@@ -29,7 +29,7 @@ def vcf_input_filter(vcf_file,lower, upper, vcf_outfile):
     """
     vcf_in = pysam.VariantFile(vcf_file)
     with open(vcf_outfile,"w") as out_f:
-        vcf_in.header.add_line(""""##FORMAT=<ID=AR,Number=1,Type=Float,Description="Allelic ratio">""")
+        vcf_in.header.add_line("""##FORMAT=<ID=AR,Number=1,Type=Float,Description="Allelic ratio">""")
         out_f.write(str(vcf_in.header))
         for rec in vcf_in.fetch():
             out_f.write(str(rec.chrom)+ "\t")
@@ -65,6 +65,7 @@ def vcf_input_filter(vcf_file,lower, upper, vcf_outfile):
                 key = keys[0]
                 sample = keys[1]
                 allelic_depth = (sample["AD"])
+                dp = (sample["DP"])
                 ref_allele = sample["AD"][0]
                 if ref_allele != None:
                     alt_allele = 0
@@ -80,6 +81,12 @@ def vcf_input_filter(vcf_file,lower, upper, vcf_outfile):
                         gt = str(sample["GT"][1]) + "/" + str(sample["GT"][1])
                     else:
                         gt = "0" + "/" + str(sample["GT"][1]) 
+                        if int(dp) < 10:
+                            print("HERE")
+                            print(rec.pos)
+                            print(sample["GT"])
+                            gt = './.'
+
                     keys = sample.keys()[1:]
                     keys_out = [sample[key] for key in keys]
                     out_str_list = [] 

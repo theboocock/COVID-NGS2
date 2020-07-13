@@ -29,7 +29,7 @@ samtools view -s $FRAC -b $INFILE -L hg38_rRNA.bed |samtools view -c > ${INFILE}
 samtools view -s $FRAC -b $INFILE sars2 | samtools view -c > ${INFILE}_sars2_count.txt
 samtools view  4 -s $FRAC -c $INFILE > ${INFILE}_unmapped_count.txt
 """
-
+#TODO: use the variable as input
 SAMTOOLS_REGION_COUNT= """
     samtools view -c {bam_in} -L {region_in} 
 """

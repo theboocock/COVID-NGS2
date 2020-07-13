@@ -33,23 +33,33 @@ def process_insert_sizes(insert_sizes):
             if line.startswith("MEDIAN_INSERT_SIZE"):
                 next_line = True 
 
-def combine_qc(map_stat_in,coverage_in, insert_size_line,output_file, complete_coverage_in,read_count):
+def combine_qc(map_stat_in,coverage_in, insert_size_line,output_file, complete_coverage_in,read_count, mapstat_md,no_dedup_cov):
     with open(output_file,"w") as out_f:
         with open(map_stat_in) as map_in:
             with open(coverage_in) as coverage_f:
                 with open(complete_coverage_in) as coverage_full:
                     with open(read_count) as read_count_in:
-                        cov_total = 0
-                        for i, line in enumerate(coverage_full):
-                            s_line = line.split("\t")
-                            cov = int(s_line[2])
-                            cov_total += cov
-                        cov_mean = str(cov_total / ( i * 1.0))
-                        coverage = coverage_f.readline().strip()
-                        map_stat_in = map_in.readline().strip()
-                        map_stat_in = map_stat_in.replace("\t"," ")
-                        read_count = str(int(read_count_in.readline().strip())/2)
-                        out_f.write(coverage + " "  + cov_mean+ " " + map_stat_in + " " + read_count + " "  + insert_size_line+ "\n")
+                        with open(mapstat_md) as map_stat_md_sars:
+                            with open(no_dedup_cov) as no_dedup_cov_out:
+                                cov_total = 0
+                                for i, line in enumerate(coverage_full):
+                                    s_line = line.split("\t")
+                                    cov = int(s_line[2])
+                                    cov_total += cov
+                                cov_mean = str(cov_total / ( i * 1.0))
+                                cov_total = 0
+                                for i, line in enumerate(no_dedup_cov_out):
+                                    s_line = line.split("\t")
+                                    cov = int(s_line[2])
+                                    cov_total += cov
+                                cov_mean_no_dedup = str(cov_total / ( i * 1.0))
+                                coverage = coverage_f.readline().strip()
+                                map_stat_in = map_in.readline().strip()
+                                map_stat_in = map_stat_in.replace("\t"," ")
+                                read_count = str(int(read_count_in.readline().strip())/2)
+                                mapstat_md_sars_number= str(int(map_stat_md_sars.readline().strip()))
+                                out_f.write(coverage + " "  + cov_mean+ " " + cov_mean_no_dedup + " " + map_stat_in + " " + read_count + " "+ 
+                                        mapstat_md_sars_number  + " " + insert_size_line+ "\n")
 
 
 
@@ -61,6 +71,8 @@ def main():
     parser.add_argument("-i","--insert-sizes",dest="insert_sizes",help="Insert sizes",required=True)
     parser.add_argument("-o","--output-file",dest="output_file",help="output_file",required=True)
     parser.add_argument("--read-count",dest="read_count_in",help="Read count", required=True)
+    parser.add_argument("--mapstat-md",dest="mapstat_md",help="Map statmp sars2 mapping count",required=True)
+    parser.add_argument("--no-dedup-coverage",dest="no_dedup_coverage",help="No deduplications coverae total", required=True)
     args = parser.parse_args()
     map_stat_in = args.map_stat_in
     coverage_in = args.coverage_in
@@ -69,9 +81,11 @@ def main():
     complete_coverage = args.complete_coverage_in
     read_count = args.read_count_in
     insert_size_line = process_insert_sizes(insert_sizes)
+    mapstat_md = args.mapstat_md
+    no_dedup_cov = args.no_dedup_coverage
     if insert_size_line == None:
         insert_size_line = "0 0"
-    combine_qc(map_stat_in, coverage_in, insert_size_line, output_file, complete_coverage, read_count) 
+    combine_qc(map_stat_in, coverage_in, insert_size_line, output_file, complete_coverage, read_count, mapstat_md,no_dedup_cov) 
 
 
 

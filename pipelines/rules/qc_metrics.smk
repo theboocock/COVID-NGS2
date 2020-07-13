@@ -1,3 +1,39 @@
+rule umi_qc_output:
+    input:
+        input_bam="outputs/mapping_stats/bam_subset/{sample}.groupumi.bam"
+    output:
+        output_df="outputs/amplicon_qc/umi/{sample}.check_run"
+    params:
+        sample_type = get_sample_type
+    run:
+        if "amp" in params.sample_type:
+            shell("{SCRIPTS_DIR}/amplicon/get_umi_list.py --bam {input.input_bam} --sample {wildcards.sample} --output-df {output.output_df}")
+        else:
+            shell("echo NOTAMP > {output.output_df}")
+
+               
+
+rule aggregate_umi_amplicon_qc:
+    input:
+        expand("outputs/amplicon_qc/umi/{sample}.check_run",sample=samples)
+    output:
+        amp_df="outputs/amplicon_qc/umi/amplicon_df.txt",
+    run:
+        with open(output.amp_df,"w") as out_f:
+            out_f.write("sample\tpos\tUB\tMI\tmerged_uid\n")
+            for f in input:
+                sample_in = os.path.basename(f).split(".check_run")[0]
+                merged_id = mapped_sample_names[sample_in]
+                with open(f) as in_f:
+                    line = in_f.readline()
+###
+                    if "NOTAMP" in line:
+                        continue
+                    for i, line in enumerate(in_f):
+                        if i > 0:
+                            out_f.write(line.strip() + "\t" + merged_id + "\n")
+
+
 rule picard_insert_size_metrics:
     """
         Run PicardTools CollectInsertSizeMetrics 
@@ -37,18 +73,22 @@ rule generate_coverage_plot:
     shadow: "minimal"
     group: "ag"
     input:
-        bam="outputs/mapping_stats/bam_subset/{sample}.bam"
+        bam="outputs/mapping_stats/bam_subset/{sample}.bam",
+        bam_amplicon="outputs/mapping_stats/bam_subset/{sample}.amplicon.bam"
     output:
-        "outputs/coverage/{intervals}/{sample}.cov"
+        coverage_dedup="outputs/coverage/{intervals}/{sample}.cov",
+        coverage_non_dedup="outputs/coverage/{intervals}/{sample}.no_dedup.cov"
     params:
         sample_type = get_sample_type
     run:
         if "neb" in params.sample_type:
             shell("samtools view -h -F 1024 -bS {input.bam} > test.bam")
             shell("samtools index test.bam")
-            shell("bedtools genomecov -ibam test.bam -d > {output}")
+            shell("bedtools genomecov -ibam test.bam -d > {output.coverage_dedup}")
+            shell("bedtools genomecov -ibam {input.bam_amplicon} -d > {output.coverage_non_dedup}")
         else:
-            shell("bedtools genomecov -ibam {input.bam} -d > {output}")
+            shell("bedtools genomecov -ibam {input.bam} -d > {output.coverage_dedup}")
+            shell("bedtools genomecov -ibam {input.bam_amplicon} -d > {output.coverage_non_dedup}")
 
 rule make_coverage_plot:
     """
@@ -77,19 +117,20 @@ rule ag_qc_output:
         "outputs/qc_report/all.qc"
     run:
         with open(output[0],"w") as out_f:
-            out_f.write("sample coverage_5x coverage_mean mapped_human mapped_rrna mapped_sars2 unmapped total_read_count median_insert_size mad_isert_size sars2_percent\n") 
+            out_f.write("sample coverage_3x coverage_mean_dedup coverage_mean_dup mapped_human mapped_rrna mapped_sars2_dedup unmapped total_read_count mapped_sars2_dup median_insert_size mad_isert_size sars2_percent_dedup sars2_percent_dup\n") 
             for f in input:
                 sample = os.path.basename(f).split(".qc")[0]
                 with open(f) as in_f:
                     for line in in_f:
                         line_split = line.split()
-                        total_mapped =  (int(line_split[2]) + int(line_split[3]) + int(line_split[4])) 
+                        total_mapped =  int(float(line_split[7])) 
                         if total_mapped == 0:
-                            total = 0 
+                            sars2_dedup =  0
+                            sars2_no_dedup = 0
                         else:
-                            total = 100 * int(line_split[4]) / int(float(line_split[6]))
-                        line_split[6] = int(float(line_split[6]))
-                        out_f.write(sample + " " + line.strip() + " " + str(total) + "\n")
+                            sars2_dedup = 100 * int(line_split[5]) / int(float(line_split[7]))
+                            sars2_no_dedup = 100 * int(line_split[8]) / int(float(line_split[7]))
+                        out_f.write(sample + " " + line.strip() + " " + str(sars2_dedup) +" " + str(sars2_no_dedup) + "\n")
 
 import pandas as pd
 rule merge_meta_data:
@@ -149,13 +190,15 @@ rule calculate_mapping_statistics:
         bai=("outputs/mapping_stats/md/{sample}.sorted.md.bam.bai"),
         bam_subset="outputs/mapping_stats/bam_subset/{sample}.bam"
     output:
-        "outputs/mapping_stats/{sample}.mapstat"
+        mapstat ="outputs/mapping_stats/{sample}.mapstat",
+        mapstat_md = "outputs/mapping_stats/{sample}.mapstat_md"
     log:
         "logs/mapping_stats/{sample}.log"
     params:
         tmpdir="-Djava.io.tmpdir=tmpdir"
-    shell:
-        "{SCRIPTS_DIR}/calculate_mapping_statistics.py -b {input.bam} -c {CONFIGFILE}  -o {output} --bam-subset {input.bam_subset}"
+    run:
+        shell("{SCRIPTS_DIR}/calculate_mapping_statistics.py -b {input.bam} -c {CONFIGFILE}  -o {output.mapstat} --bam-subset {input.bam_subset}")
+        shell("samtools view -q {MAPQ_FILT} -c {input.bam} sars2 > {output.mapstat_md}")
 
 rule qc_output:
     """
@@ -167,11 +210,13 @@ rule qc_output:
         coverage=expand("outputs/consensus/{{intervals}}/{MIN_DEPTH}/{{sample}}.cov",MIN_DEPTH=MIN_DEPTH),
         insert_sizes="outputs/insert_sizes/{sample}.insert_sizes",
         coverage_full="outputs/coverage/{intervals}/{sample}.cov",
-        read_count="outputs/read_counts/{sample}.txt"
+        read_count="outputs/read_counts/{sample}.txt",
+        mapstat_md="outputs/mapping_stats/{sample}.mapstat_md",
+        coverage_full_nodedup="outputs/coverage/{intervals}/{sample}.no_dedup.cov"
     output:
         "outputs/qc_report/{intervals}/{sample}.qc"
     shell:
-        "{SCRIPTS_DIR}/combine_metrics.py -m {input.mapstat} -c {input.coverage} -i {input.insert_sizes} -o {output} -a {input.coverage_full} --read-count {input.read_count} "
+        "{SCRIPTS_DIR}/combine_metrics.py -m {input.mapstat} -c {input.coverage} -i {input.insert_sizes} -o {output} -a {input.coverage_full} --read-count {input.read_count} --mapstat-md {input.mapstat_md} --no-dedup-cov {input.coverage_full_nodedup}"
 
 
 rule amplicon_qc_output:
@@ -191,6 +236,8 @@ rule amplicon_qc_output:
         else: 
             shell("echo NOTAMP > {output}")
 
+
+## TODO: this probably doesn't work anymore but I think YI has what she need
 rule combine_amplicon_qc_output:
     input:
         "outputs/amplicon_qc/amplicon_df.txt",
@@ -207,7 +254,7 @@ rule combine_amplicon_qc_output:
             out_df["sample"] = key
             if len(items_df) > 1:
                 for df in items_df[1:]:
-                    out_df["count"] = df["count"]
+                    out_df["count"] += df["count"]
         out_df.to_csv(output[0], sep="\t",index=False)          
 
 rule aggregate_amplicon_qc:

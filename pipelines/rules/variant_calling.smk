@@ -250,11 +250,13 @@ rule aggregate_consensus_from_merged:
     group: "ag"
     input:
         # Hardcoded depth filter
-        input_fasta=expand("outputs/consensus/merged/{intervals}/{{depth}}/{sample}.fasta",sample=mapped_uid.keys(),intervals=intervals),
-        input_phylo=expand("outputs/consensus/merged/phylo/{intervals}/{{depth}}/{sample}.fasta",sample=mapped_uid.keys(),intervals=intervals)
+        input_fasta=expand("outputs/consensus/merged/{intervals}/{depth}/{sample}.fasta",sample=mapped_uid.keys(),intervals=intervals,depth=MIN_DEPTH),
+        input_phylo=expand("outputs/consensus/merged/phylo/{intervals}/{depth}/{sample}.fasta",sample=mapped_uid.keys(),intervals=intervals,depth=MIN_DEPTH)
     output:
         fasta_one="outputs/consensus/merged/{intervals}/all_{depth}.fasta",
-        fasta_two="outputs/consensus/merged/phylo/{intervals}/all_{depth}.fasta"
+        fasta_two="outputs/consensus/merged/phylo/{intervals}/all_{depth}.fasta",
+        all_fasta="outputs/consensus/merged/{intervals}/all_{depth}_none.fasta",
+        all_fasta_phylo="outputs/consensus/merged/phylo/{intervals}/all_{depth}_none.fasta"
     run:
         coverage_file = ""
         with open(output.fasta_one,"w") as out_f:
@@ -271,6 +273,20 @@ rule aggregate_consensus_from_merged:
                                 if i == 0:
                                     samples.append(line.strip().split(">")[1])
                                 i = i + 1
+        with open(output.all_fasta,"w") as out_f:
+            for f in input.input_phylo:
+                with open(f) as in_f:
+                    i = 0
+                    for line in in_f:
+                        out_f.write(line)
+                        i = i + 1
+        with open(output.all_fasta_phylo,"w") as out_f:
+            for f in input.input_phylo:
+                with open(f) as in_f:
+                    i = 0
+                    for line in in_f:
+                        out_f.write(line)
+                        i = i + 1
         with open(output.fasta_two,"w") as out_f:
             for f in input.input_phylo:
                     with open(f) as in_f:
@@ -289,8 +305,7 @@ rule get_consensus_from_merged:
     group: "vcf_output"
     input:
         interval = "outputs/bcftools_vcfs/merged/filt/{intervals}/{sample}.snps_and_indels.vcf.gz",
-
-        quasi_in= "outputs/final/merged/quasi_species/all.vcf",
+        quasi_in= "outputs/quasi_species/merged/all.vcf",
         bam="outputs/mapping_stats/bam_subset/merged/{sample}.bam",
         coverage="outputs/coverage/merged/sars2/{sample}.cov"
     output:
@@ -346,8 +361,8 @@ rule get_consensus:
     params:
         sample=get_sample_name
     run:
-        shell("{SCRIPTS_DIR}/generate_consensus.py  --coverage-in {input.coverage} -v {input.interval} -d {wildcards.depth} -p 1.0 -o {output.fasta_phylo} -c /dev/null -r {SARS_REF}        -i {input.bam} -s {params.sample} -m {SITES_TO_MASK} --quasi_vcf {input.interval}")
-        shell("{SCRIPTS_DIR}/generate_consensus.py  --coverage-in {input.coverage} -v {input.interval} -d {wildcards.depth} -p 1.0 -o {output.fasta} -c {output.coverage} -r {SARS_REF}        -i {input.bam} -s {params.sample} --quasi_vcf {input.interval}")
+        shell("{SCRIPTS_DIR}/generate_consensus.py  --coverage-in {input.coverage} -v {input.interval} -d {wildcards.depth} -p 1.0 -o {output.fasta_phylo} -c /dev/null -r {SARS_REF}        -i {input.bam} -s {params.sample} -m {SITES_TO_MASK} --quasi-vcf {input.interval}")
+        shell("{SCRIPTS_DIR}/generate_consensus.py  --coverage-in {input.coverage} -v {input.interval} -d {wildcards.depth} -p 1.0 -o {output.fasta} -c {output.coverage} -r {SARS_REF}        -i {input.bam} -s {params.sample} --quasi-vcf {input.interval}")
         
 
 rule map_consensus_to_genome:

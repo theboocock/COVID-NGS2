@@ -23,10 +23,13 @@ PATHS:
     SITES_TO_MASK: !BASE_PIPELINE!/ref/sites_to_mask/mask_problematic.bed
     ALL_PRIMERS: !BASE_PIPELINE!/ref/amplicon/all_primers_june24.bed
     ARCTIC_LOCATIONS: !BASE_PIPELINE!/ref/amplicon/arctic_positions.bed
+    GISAID_CLADES: !BASE_PIPELINE!/ref/clades/gisaid.tsv
+    NEXTSTRAIN_CLADES: !BASE_PIPELINE!/ref/clades/nextstrain.tsv
+    SARS2_REF_GENBANK: !BASE_PIPELINE!/ref/clades/reference_seq.gb
 PARAMS:
     HAPLOTYPE_CORES: 1
-    MIN_QUAL: 30 
-    MIN_DEPTH: 5
+    MIN_QUAL: 20 
+    MIN_DEPTH: 3
     FRAC_STRAND:  10
     SARS_GENOME_NAME: sars2
     MAPQ_FILT: 20

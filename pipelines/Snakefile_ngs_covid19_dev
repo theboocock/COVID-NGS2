@@ -9,7 +9,7 @@ CONFIGFILE= workflow.current_basedir + "/defaults.yaml"
 wildcard_constraints: 
     sample="(?!merged)([a-z0-9A-Z-_]+)",
     intervals="(?!merged)(?!phylo)([a-z0-9A-Z-_]+)",
-    depth="(?!merged)([a-z0-9A-Z-_]+)",
+    depth="(?!merged)([0-9]+)",
     uid_lib="(?!merged)([a-z0-9A-Z-_]+)"
 import configparser
 import pyfasta
@@ -46,6 +46,10 @@ TRIMMOMATIC_PATH=config["PATHS"]["TRIMMOMATIC_PATH"]
 BRACKEN_PATH=config["PATHS"]["BRACKEN_PATH"]
 
 ARCTIC_LOCATIONS=config["PATHS"]["ARCTIC_LOCATIONS"]
+
+GISAID_CLADES=config["PATHS"]["GISAID_CLADES"]
+NEXTSTRAIN_CLADES=config["PATHS"]["NEXTSTRAIN_CLADES"]
+SARS2_REF_GENBANK=config["PATHS"]["SARS2_REF_GENBANK"]
 ## TODO: ADD MIN_COV
 #
 #MIN_COVERAGE=config["PARAMS"]["MIN_COV"]
@@ -54,7 +58,7 @@ ARCTIC_LOCATIONS=config["PATHS"]["ARCTIC_LOCATIONS"]
 
 include: "rules/utils.smk"
 
-depth_range = [3]
+depth_range = [int(MIN_DEPTH)]
 min_cov = 0.8
 
 taxon_dict = read_taxid(TAXON_IN)
@@ -95,18 +99,31 @@ except KeyError:
 #    input:
 #        expand("outputs/kraken2/{sample}.kraken_report.txt",sample=samples)
 #
+#print(samples
+
+mapped_sample_names = {}
+for key, value in mapped_uid.items():
+    for val in value:
+        mapped_sample_names[str(val)] = key 
+
+#
+#
+#rule all:
+#    input:
 rule all:
     input:
         expand("outputs/mapping_stats/bam_subset/merged/{uid_lib}.bam", uid_lib=mapped_uid.keys()),
+        "outputs/amplicon_qc/umi/amplicon_df.txt",
         expand("outputs/mapping_stats/md/merged/{uid_lib}.bam", uid_lib=mapped_uid.keys()),
         #expand("outputs/kraken2/{sample}.kraken_report.txt",sample=samples),
         expand("outputs/consensus/merged/{intervals}/all_{depth}.fasta", depth=depth_range, intervals=intervals),
         expand("outputs/abundances/merged/{sample}.bracken", sample=mapped_uid.keys()), 
         expand("outputs/coverage/merged/coverage_plots/{intervals}/{sample}.png", intervals=intervals, sample=mapped_uid.keys()), 
+        expand("outputs/mapping_stats/bam_subset/{sample}.bam", sample=samples),
         "outputs/ncov/merged/all.fasta",
         "outputs/bcftools_vcfs/merged/all.vcf.gz",
         "outputs/quasi_species/merged/all.vcf",
-        expand("outputs/raw_fastqs/{sample}.R1.fastq.gz",sample=samples),
+#        expand("outputs/raw_fastqs/{sample}.R1.fastq.gz",sample=samples),
        # TODO check if it works#
       #"test.png",
         expand("outputs/coverage/coverage_plots/{intervals}/{sample}.png", intervals=intervals, sample=samples), 
@@ -132,7 +149,7 @@ rule all:
         "outputs/final/abundances.bracken",
         "outputs/pangolin/lineages.csv",
         #"outputs/final/qc_report.tsv",
-        "outputs/qc_report/all.qc",
+        "outputs/qc_report/qc_report.tsv",
         directory(expand("outputs/final/merged/coverage_plots/{intervals}/",intervals=intervals)),
         #""outputs/final/filtered/metadata.csv",
         "outputs/final/merged/qc_report.tsv",
@@ -153,7 +170,9 @@ rule generate_final_dataset_package:
         read_two = expand("outputs/filtered_fastqs/{intervals}/{sample}.R2.fastq.gz",intervals=intervals, sample=samples),
         depleted_read_one = expand("outputs/depleted_fastqs/human/{sample}.R1.fastq.gz",sample=samples),
         depleted_read_two = expand("outputs/depleted_fastqs/human/{sample}.R2.fastq.gz", sample=samples),
-        merged_vcf = "outputs/bcftools_vcfs/merged/filt/sars2/all.vcf.gz"
+        merged_vcf = "outputs/bcftools_vcfs/merged/filt/sars2/all.vcf.gz",
+        nextstrain_clade="outputs/clades/nextstrain/lineages.csv",
+        gisaid_clades="outputs/clades/gisaid/lineages.csv"
     output:
         merged_csv=report("outputs/final/merged/qc_report.tsv",category="qc_reports/final",caption=workflow.basedir + "/report/coverage_plots.rst"),
         merged_csv_unfiltered=report("outputs/qc_report/merged/qc_report.tsv",category="qc_reports/merged",caption=workflow.basedir + "/report/coverage_plots.rst"),
@@ -173,8 +192,9 @@ rule generate_final_dataset_package:
         df = pd.DataFrame(columns=metadata.columns)
         df = df.drop(columns=["sample","strain","lib_name","fastq_one","fastq_two","run_name"])
         all_qc = pd.read_csv(input.qc_report_in,sep=" ")
-
+        print(all_qc)
         md_m= metadata.merge(all_qc,left_on="sample",right_on="sample")
+        print(md_m)
         #pango_in = pd.read_csv(input.pangolin_out,sep=",")
         #md_m = md_m.merge(pango_in,left_on="strain",right_on="taxon",how="outer")
         md_m = md_m.fillna(value="NA")
@@ -185,16 +205,18 @@ rule generate_final_dataset_package:
         for key, samples in mapped_uid.items():
             qc_rows = all_qc[all_qc["sample"].isin(samples)]
             tmp_row = {}
-            qc_rows = qc_rows[["mapped_human","mapped_rrna","mapped_sars2","unmapped","total_read_count"]].apply(np.sum,axis=0)
+            qc_rows = qc_rows[["mapped_human","mapped_rrna","mapped_sars2_dedup","mapped_sars2_dup","unmapped","total_read_count"]].apply(np.sum,axis=0)
+            #qc_rows = qc_rows[["mapped_human","mapped_rrna","mapped_sars2","unmapped","total_read_count"]].apply(np.sum,axis=0)
             metadata[metadata["sample"].isin(samples)]
-            row_tuples.append((key, qc_rows["mapped_human"],qc_rows["mapped_rrna"], qc_rows["mapped_sars2"], qc_rows["unmapped"],qc_rows["total_read_count"] )) 
+            row_tuples.append((key, qc_rows["mapped_human"],qc_rows["mapped_rrna"], qc_rows["mapped_sars2_dedup"],qc_rows["mapped_sars2_dup"], qc_rows["unmapped"],qc_rows["total_read_count"] )) 
                 ### now we load in everything we need to calculate i.e mapping stat ##
-            with open("outputs/consensus/merged/sars2/5/{sample}.cov".format(sample=key)) as in_f:
+            with open("outputs/consensus/merged/sars2/{MIN_DEPTH}/{sample}.cov".format(sample=key,MIN_DEPTH=MIN_DEPTH)) as in_f:
                 for line in in_f:
                     coverage_tuples.append((key, float(line), sample_names_hash[key][0],sample_names_hash[key][1]))
             cov_in = pd.read_csv("outputs/coverage/merged/sars2/{sample}.cov".format(sample=key),sep="\t",header=None) 
-
-            mean_coverage = np.mean(cov_in[2])
+            mean_coverage_dedup = np.mean(cov_in[2])
+            cov_in = pd.read_csv("outputs/coverage/merged/sars2/{sample}.no_dedup.cov".format(sample=key),sep="\t",header=None) 
+            mean_coverage_no_dedup = np.mean(cov_in[2])
             tmp_metadata=metadata[metadata["sample"].isin(samples)]
             ### TODO: add to finnal column as josh requested
             lib_names =",".join(tmp_metadata["lib_name"]) 
@@ -202,15 +224,32 @@ rule generate_final_dataset_package:
             fastq_two = ",".join(tmp_metadata["fastq_two"])
             samples_str = [str(sample) for sample in samples]
             samples_out = ",".join(samples_str)
-            library_tuples.append((key, lib_names, fastq_one, fastq_two, samples_out ,mean_coverage))
-        coverage_5x_df = pd.DataFrame(coverage_tuples, columns=["merged_id","coverage_5x","read_group_name","uid_lib"])
-        library_df = pd.DataFrame(library_tuples, columns=["merged_id","lib_names","fastqs_one","fastqs_two","library_id_internal","coverage_mean"])
-        out_df = pd.DataFrame(row_tuples, columns=["merged_id","mapped_human","mapped_rrna","mapped_sars2","unmapped","total_read_count"])
-        out_df["sars2_percent"] = out_df["mapped_sars2"]/(out_df["mapped_human"] + out_df["mapped_rrna"] + out_df["mapped_sars2"]) * 100
+            library_tuples.append((key, lib_names, fastq_one, fastq_two, samples_out ,mean_coverage_dedup, mean_coverage_no_dedup))
+        coverage_5x_df = pd.DataFrame(coverage_tuples, columns=["merged_id","coverage_3x","read_group_name","uid_lib"])
+        library_df = pd.DataFrame(library_tuples, columns=["merged_id","lib_names","fastqs_one","fastqs_two","library_id_internal","coverage_mean_dedup","coverage_mean_no_dedup"])
+        out_df = pd.DataFrame(row_tuples, columns=["merged_id","mapped_human","mapped_rrna","mapped_sars2_dedup","mapped_sars2_dup","unmapped","total_read_count"])
+        #sars2_percent_dedup","sars2_percent_dup"
+        out_df["sars2_percent_dup"] = out_df["mapped_sars2_dup"]/out_df["total_read_count"]
+        out_df["sars2_percent_dedup"] = out_df["mapped_sars2_dedup"]/out_df["total_read_count"]
+        #out_df["sars2_percent"] = out_df["mapped_sars2"]/(out_df["mapped_human"] + out_df["mapped_rrna"] + out_df["mapped_sars2"]) * 100
         pango_in = pd.read_csv(input.pangolin_out, sep=",")
         out_df = out_df.merge(coverage_5x_df, left_on="merged_id", right_on="merged_id", how="outer")
         out_df = out_df.merge(library_df, left_on="merged_id", right_on="merged_id", how="outer")
         out_df = out_df.merge(pango_in, left_on="read_group_name", right_on="taxon", how="outer")
+        #### 
+        ####
+        #nextstrain_clade="outputs/clades/nextstrain/lineages.csv",
+        #gisaid_clades="outputs/clades/gisaid/lineages.csv"
+        nextstrain_in = pd.read_csv(input.nextstrain_clade,sep="\t",skiprows=1,names=["read_group_name","nextstrain_clade","nextstrain_parent_clade"]) 
+        gisaid_in =  pd.read_csv(input.gisaid_clades,sep="\t",skiprows=1, names=["read_group_name","gisaid_clade","gisaid_parent_clade"]) 
+ 
+        ##nextstrain_in = pd.read_csv(input.nextstrain_clade,sep="\t",header=True,skiprows=1,names=["read_group_name","gisaid_clade","gisaid_parent_clade"]) 
+        out_df = out_df.merge(nextstrain_in, left_on="read_group_name", right_on="read_group_name",how="outer")
+        out_df = out_df.merge(gisaid_in, left_on="read_group_name", right_on="read_group_name",how="outer")
+        ### Rename columns to nextstrain.
+        #
+        #
+            
         ## Now merged with metadata .... ### 
         out_df = out_df.merge(metadata,left_on="uid_lib",right_on="id_library_type")
         out_df = out_df.drop_duplicates(subset=["uid_lib"])
@@ -271,11 +310,15 @@ rule generate_coverage_plot_merged:
     shadow: "minimal"
     group: "ag"
     input:
-        bam="outputs/mapping_stats/bam_subset/merged/{sample}.bam"
+        bam="outputs/mapping_stats/bam_subset/merged/{sample}.bam",
+        bam_md="outputs/mapping_stats/bam_subset/merged/{sample}.amplicon.bam",
     output:
-        "outputs/coverage/merged/{intervals}/{sample}.cov"
-    shell:
-        "bedtools genomecov -ibam {input.bam} -d > {output}"
+        output_merged="outputs/coverage/merged/{intervals}/{sample}.cov",
+        output_merged_no_dedup="outputs/coverage/merged/{intervals}/{sample}.no_dedup.cov"
+    run:
+        shell("bedtools genomecov -ibam {input.bam} -d > {output.output_merged}")
+        shell("bedtools genomecov -ibam {input.bam_md} -d > {output.output_merged_no_dedup}")
+
 
 rule make_coverage_plot_merged:
     """
