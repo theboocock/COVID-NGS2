@@ -445,9 +445,9 @@ rule merged_raw_bams:
         if len(input.bams) != 1:
             # Skip merge
             shell("samtools merge tmp.bam {input.bams} && samtools sort tmp.bam > sorted.bam")
-            shell("java -jar {PICARD_PATH} AddOrReplaceReadGroups I=sorted.bam O={output.bam} RGID=1 RGSM={params.rg} RGLB=4 RGPL=ILLUMINA RGPU=unit1")
+            shell("java  -XX:ParallelGCThreads=1 -jar {PICARD_PATH} AddOrReplaceReadGroups I=sorted.bam O={output.bam} RGID=1 RGSM={params.rg} RGLB=4 RGPL=ILLUMINA RGPU=unit1")
         else:
-            shell("java -jar {PICARD_PATH} AddOrReplaceReadGroups I={input.bams} O={output.bam} RGID=1 RGSM={params.rg} RGLB=4 RGPL=ILLUMINA RGPU=unit1")
+            shell("java  -XX:ParallelGCThreads=1 -jar {PICARD_PATH} AddOrReplaceReadGroups I={input.bams} O={output.bam} RGID=1 RGSM={params.rg} RGLB=4 RGPL=ILLUMINA RGPU=unit1")
         shell("samtools index {output}")
 
 def get_all_uid_bam(wildcards):

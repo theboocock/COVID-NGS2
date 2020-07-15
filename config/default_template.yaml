@@ -15,8 +15,6 @@ PATHS:
     BRACKEN_PATH: !BASE_PIPELINE!//software/Bracken-2.5/bracken 
     TAXON_ID: !BASE_PIPELINE!/ref/kraken/taxid_to_name.txt
     KRAKEN2_DB: !BASE_PIPELINE!/ref/kraken/minikraken_8GB_20200312/
-    GISAID_FASTA:  !BASE_PIPELINE!/ref/gisaid/gisaid.fasta
-    GISAID_METADATA: !BASE_PIPELINE!/ref/gisaid/gisaid.tsv
     OPOOL_FILE: !BASE_PIPELINE!/ref/amplicon/COVID_384rtPrimers.srt.bed
     ARCTIC_FILE: !BASE_PIPELINE!/ref/amplicon/nCoV-2019.tsv
     BCL2FASTQ: !BASE_PIPELINE!/software/bcl2fastq/bcl2fastq
@@ -26,6 +24,8 @@ PATHS:
     GISAID_CLADES: !BASE_PIPELINE!/ref/clades/gisaid.tsv
     NEXTSTRAIN_CLADES: !BASE_PIPELINE!/ref/clades/nextstrain.tsv
     SARS2_REF_GENBANK: !BASE_PIPELINE!/ref/clades/reference_seq.gb
+    GISAID_FASTA:  !BASE_PIPELINE!/ref/gisaid/sequences_2020-07-10_23-53.fasta
+    GISAID_METADATA: !BASE_PIPELINE!/ref/gisaid/metadata_2020-07-10_23-53.tsv
 PARAMS:
     HAPLOTYPE_CORES: 1
     MIN_QUAL: 20 
