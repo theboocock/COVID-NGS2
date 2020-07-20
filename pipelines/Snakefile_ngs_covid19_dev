@@ -108,10 +108,20 @@ for key, value in mapped_uid.items():
 
 #
 #
-#rule all:
-#    input:
+rule phased_final:
+    input:
+        "outputs/final/merged/quasi_species/all.vcf"
+    output:
+        "outputs/quasi_species/merged/phased.vcf.gz"
+    run:
+        shell("java -jar {SOFTWARE_PATH}/beagle/beagle.18May20.d20.jar gt={input} out=test")
+        shell("cp test.vcf.gz {output}")
+
+
 rule all:
     input:
+        "outputs/quasi_species/merged/all_from_merged.vcf",
+        "outputs/quasi_species/merged/phased.vcf.gz",
         expand("outputs/mapping_stats/bam_subset/merged/{uid_lib}.bam", uid_lib=mapped_uid.keys()),
         "outputs/amplicon_qc/umi/amplicon_df.txt",
         expand("outputs/mapping_stats/md/merged/{uid_lib}.bam", uid_lib=mapped_uid.keys()),
@@ -156,7 +166,7 @@ rule all:
         expand("outputs/bcftools_vcfs/merged/filt/{intervals}/all.vcf.gz",intervals=intervals),
         "outputs/final/merged/annovar/all_filtered_annovar_table.txt",
         "outputs/final/merged/quasi_species/all.vcf"
-#  #     "outputs/consensus/merged/sars2/all_5.tsv",
+  #     "outputs/consensus/merged/sars2/all_5.tsv",
 #
 import shutil
 import numpy as np

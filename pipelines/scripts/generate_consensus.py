@@ -94,26 +94,38 @@ def get_sample_vcf(vcf_gz, sample,quasi_vcf):
 import shutil
 invert_bed = "bedtools subtract -a tmp.bed -b vcf_mask.bed > vcf_mask_invert.bed"
 ### ignore het sites ##  
-def get_consensus_fasta(reference_genome, sample, output_consensus, output_cov, snps_to_exclude_bed):
+def get_consensus_fasta(reference_genome, sample, output_consensus, output_cov, snps_to_exclude_bed,phased,quasi_vcf):
 
     #if snps_to_exclude_bed is not None:
     #    merged_bed_cmd = __BEDTOOLS_MERGE__.format("mask.bed",snps_to_exclude_bed)
     #    subprocess.check_call(merged_bed_cmd,shell=True)
     #else:
     #    merged_bed_cmd = shutil.copy("mask.bed", "merged_masked.bed") 
+
     with open("tmp.bed","w") as out_f:
         out_f.write("sars2\t0\t29903\n")
     subprocess.check_call(invert_bed,shell=True) 
-    subprocess.check_call("cat vcf_mask_invert.bed vcf_het.bed | sort -k 2,2g | bedtools merge -i stdin > vcf_het_mask_invert.bed",shell=True)
-    con_cmd = __BCFTOOLS_CONSENSUS_TEMPLATE__.format(sample, reference_genome, "con.fasta")
-    subprocess.check_call(con_cmd,shell=True)
-    with open("con.fasta") as con:
-        with open(output_consensus,'w') as out_f:
-            for line in con:
-                if ">" in line:
-                    out_f.write(">" + sample + "\n")
-                else:
-                    out_f.write(line)
+
+    if phased:
+        output_consensus_final = output_consensus.split(".fasta")[0]+ "_2.fasta"
+        sample_cmd = __BCFTOOLS_SAMPLE_TEMPLATE__.format(quasi_vcf, sample)
+        subprocess.check_call(sample_cmd,shell=True)
+        set_one="""bcftools consensus -f {reference} -m vcf_mask_invert.bed -H 1 -s {sample} -o {output_consensus} sample.vcf.gz """.format(sample=sample, output_consensus=output_consensus, reference=reference_genome)
+        set_two ="""bcftools consensus -f {reference} -m vcf_mask_invert.bed -H 2 -s {sample} -o {output_consensus} sample.vcf.gz """.format(sample=sample, output_consensus=output_consensus_final,reference=reference_genome) 
+        print(set_one)
+        subprocess.check_call(set_one,shell=True)
+        subprocess.check_call(set_two,shell=True)
+    else:
+        subprocess.check_call("cat vcf_mask_invert.bed vcf_het.bed | sort -k 2,2g | bedtools merge -i stdin > vcf_het_mask_invert.bed",shell=True)
+        con_cmd = __BCFTOOLS_CONSENSUS_TEMPLATE__.format(sample, reference_genome, "con.fasta")
+        subprocess.check_call(con_cmd,shell=True)
+        with open("con.fasta") as con:
+            with open(output_consensus,'w') as out_f:
+                for line in con:
+                    if ">" in line:
+                        out_f.write(">" + sample + "\n")
+                    else:
+                        out_f.write(line)
     cov_cmd =__BIOAWK_COV__.format(output_consensus, output_cov)
     subprocess.check_call(cov_cmd, shell=True)
 
@@ -131,6 +143,7 @@ def main():
     parser.add_argument("-i","--bam",dest="bam_input", help="Bam input file") 
     parser.add_argument("-o","--output-fasta",dest="output_fasta", help="output fasta", required=True)
     parser.add_argument("-c","--coverage-output",dest="coverage_output", help="Coverage output", required=True)
+    parser.add_argument("--phased",dest="phased",action="store_true",help="Phased")
     parser.add_argument("--coverage-in", dest="coverage_in",help="Coverage input", required=True)
     args = parser.parse_args()
     vcf_gz = args.vcf_gz
@@ -145,9 +158,10 @@ def main():
     snps_to_exclude = args.masked_bed
     coverage_in = args.coverage_in
     quasi_vcf = args.quasi_vcf
+    phased = args.phased
     get_sample_vcf(vcf_gz=vcf_gz, sample=sample,quasi_vcf=quasi_vcf)
     #get_masking_bed(bam_input, min_depth, max_strand_prop,coverage_in) 
     get_masking_bed_vcf(vcf_gz)
-    get_consensus_fasta(reference,sample, output_fasta, coverage_output, snps_to_exclude)
+    get_consensus_fasta(reference,sample, output_fasta, coverage_output, snps_to_exclude,phased, quasi_vcf)
 if __name__=="__main__":
     main()

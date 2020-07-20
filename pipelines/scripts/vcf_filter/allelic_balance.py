@@ -69,23 +69,29 @@ def vcf_input_filter(vcf_file,lower, upper, vcf_outfile):
                 ref_allele = sample["AD"][0]
                 if ref_allele != None:
                     alt_allele = 0
+                    other = ""
                     for i, alt in enumerate(sample["AD"][1:]):
                         if alt != None:
                             alt_allele = alt 
-                            idx = i 
-                    ratio  = alt_allele/(alt_allele  + ref_allele)
-                    gt = sample["GT"] 
-                    if ratio <= lower:
-                        gt = "0/0"
-                    elif ratio >= upper:
-                        gt = str(sample["GT"][1]) + "/" + str(sample["GT"][1])
+                            idx = i
+                    if ref_allele == 0 and alt_allele == 0:
+                        ratio = 0.0
                     else:
-                        gt = "0" + "/" + str(sample["GT"][1]) 
-                        if int(dp) < 10:
-                            print("HERE")
-                            print(rec.pos)
-                            print(sample["GT"])
-                            gt = './.'
+                        ratio  = alt_allele/(alt_allele  + ref_allele)
+                    gt = sample["GT"] 
+                    if int(dp) < 3:
+                        gt = "./."
+                    else:
+                        if ratio < lower:
+                            gt = "0/0"
+                        elif ratio > upper:
+                            gt = str(sample["GT"][1]) + "/" + str(sample["GT"][1])
+                        else:
+                            other = str(idx+1)
+                            gt = "0" + "/" + other 
+                            if int(dp) < 10:
+                                gt = './.'
+                                gt = './.'
 
                     keys = sample.keys()[1:]
                     keys_out = [sample[key] for key in keys]

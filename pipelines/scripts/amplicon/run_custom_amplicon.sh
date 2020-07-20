@@ -15,12 +15,12 @@ log=$10
 
 if [ "${analysis_type}" = "neb" ]
 then
-	ln -s $read_one $read_one_out
-	ln -s $read_two $read_two_out 
+	cp $read_one $read_one_out
+	cp $read_two $read_two_out 
 elif [ "${analysis_type}" = "neb_old" ] 
 then
-	ln -s $read_one $read_one_out
-	ln -s $read_two $read_two_out 
+	cp $read_one $read_one_out
+	cp $read_two $read_two_out 
 else
 	touch $read_one_out 
 	touch $read_two_out 

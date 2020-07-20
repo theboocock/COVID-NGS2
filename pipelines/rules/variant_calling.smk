@@ -75,6 +75,24 @@ rule subset_vcf:
         """bcftools view -s {params.rg_name} {input} | bcftools view -i 'GT="1/1"' > {output} 2> {log}"""
 #    vcf="outputs/vcfs_filt/{intervals}/{sample}.vcf",
 
+rule joint_call_vcfs:
+    group: "vcf_output"
+    input:
+        bams=expand("outputs/mapping_stats/bam_subset/merged/{sample}.bam",sample=mapped_uid.keys()),
+        bam_index=expand("outputs/mapping_stats/bam_subset/merged/{sample}.bam.bai",sample=mapped_uid.keys())
+    output:
+        "outputs/quasi_species/merged/all_from_merged.vcf"
+    log:
+        "log/quasi_speciies/merged/all_from_merged.log"
+    run: 
+        shell("bcftools mpileup -a FMT/AD -a FMT/DP -f {SARS_REF} {input.bams} | bcftools call -Ov -mv | bgzip -c > test.vcf.gz && tabix -p vcf test.vcf.gz")
+        shell("bcftools view -e 'QUAL < {MIN_QUAL}' test.vcf.gz | bgzip -c > test1.vcf.gz")
+        shell("{SCRIPTS_DIR}/vcf_filter/allelic_balance.py --vcf test1.vcf.gz -o {output}")
+
+rule beagle_phasing:
+    group: "beagle_phasing"
+
+
 
 rule create_quasi_species_vcf:
     group: "vcf_output"
