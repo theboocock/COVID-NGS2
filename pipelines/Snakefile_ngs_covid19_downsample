@@ -1,0 +1,103 @@
+#https://snakemake.bitbucket.io/snakemake-tutorial.html
+#@author James Boocock
+#@date March 31, 2020
+
+## We should change this input
+configfile:  workflow.current_basedir + "/defaults.yaml" 
+CONFIGFILE= workflow.current_basedir + "/defaults.yaml" 
+
+include: "rules/config.smk"
+include: "rules/utils.smk"
+
+depth_range = [int(MIN_DEPTH)]
+min_cov = 0.8
+
+taxon_dict = read_taxid(TAXON_IN)
+metadata=fastq_match(config)
+#type_uid 
+#metadata = metadata[metadata["sample"].isin([72,83,107,131,367])]
+samples=metadata["sample"]
+# uid type merges libraries across samples
+try:
+    if config["merge_rule"] == "uid_type": 
+        mapped_uid, sample_names_hash, mapped_uids_read_one, mapped_uids_read_two = uid_library_to_sample_name_and_readgroup()
+    # merges all libraries by uid
+    elif config["merge_rule"] == "uid":
+        #  print("HERE")
+        mapped_uid, sample_names_hash, mapped_uids_read_one, mapped_uids_read_two = uid_library_to_sample_name() 
+    elif config["merge_rule"] == "uid_oligo":
+        mapped_uid, sample_names_hash, mapped_uids_read_one, mapped_uids_read_two = uid_library_to_sample_hash(merge_rule="uid_oligo") 
+    elif config["merge_rule"] == "column_uid_sample_type":
+        mapped_uid, sample_names_hash, mapped_uids_read_one, mapped_uids_read_two = uid_library_to_sample_hash(merge_rule="column_uid_sample_type")
+except KeyError:
+    mapped_uid, sample_names_hash, mapped_uids_read_one, mapped_uids_read_two = uid_library_to_sample_name_and_readgroup()
+    pass
+
+### ###
+
+### Downsampling rules ### 
+#
+# ### so we are going to filter the higher coverage samples and figure out the fractions necessary for doing downnsampling ...
+#
+#  Say coverage > 30X across the genome # 
+#
+#  Use bam subset and downsample them all ###
+#
+#
+#
+metdata_dedup = metadat[metdata["coverage_mean_dedup"] > 30]
+print(metdata_dedup))
+
+# Downsample height #
+#
+
+downsamples = [0.1,0.5.1.0,2.0,5,10,20,30]
+
+rule all:
+    input:
+        expand("outputs/consensus/imputed/sars2/imputed/{sample}_{down}.fasta",sample=mapped_uid.keys(),down=downsamples)
+
+
+rule create_downsample_bam:
+    input:
+        #bam subset
+    output:
+
+
+    params:
+        coverage=get_mean_coverage
+    shell:
+        ### Get down to fraction ###
+
+rule create_imputted_vcf:
+    input:
+        # vcf input
+        # qc input
+        # 
+        impute_vcf = ....
+        sample = ....
+    output:
+        "outputs/consensus/imputed/sars/{sample}_{down}.fasta"
+
+
+rule create_consensus_all:
+    ## Consensus from downnsample 
+    ## Consensus from imputted downsample
+
+# Pangolin for the imputted fastas.
+rule pangolin:
+    ### imputted pangolin
+    #
+    ### non imputted pangolin
+    #
+    
+rule combine_pango_qc_input:
+# Pangolin for the non imputted fastas.
+
+#rule all:
+    #    input:
+
+
+
+
+

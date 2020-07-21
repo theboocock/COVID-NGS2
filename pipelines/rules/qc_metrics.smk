@@ -296,7 +296,57 @@ rule auspice_output:
         tsv="outputs/final/merged/qc_report.tsv"
     output:
         fasta="outputs/ncov/merged/all.fasta",
-        tsv="outputs//ncov/merged/qc_report.tsv"
+        tsv="outputs/ncov/merged/qc_report.tsv"
     shell:
         "{SCRIPTS_DIR}/combine_with_public_data.sh {input.fasta} {input.tsv} {GISAID_FASTA} {GISAID_METADATA} {output.fasta} {output.tsv}"
 
+rule generate_coverage_plot_merged:
+    """
+        #TODO: rename rule
+        Use bedtools to get depth per bp.
+    
+    """
+    resources:
+        mem_mb=16000,
+        walltime=43200
+    shadow: "minimal"
+    group: "ag"
+    input:
+        bam="outputs/mapping_stats/bam_subset/merged/{sample}.bam",
+        bam_md="outputs/mapping_stats/bam_subset/merged/{sample}.amplicon.bam",
+    output:
+        output_merged="outputs/coverage/merged/{intervals}/{sample}.cov",
+        output_merged_no_dedup="outputs/coverage/merged/{intervals}/{sample}.no_dedup.cov"
+    run:
+        shell("bedtools genomecov -ibam {input.bam} -d > {output.output_merged}")
+        shell("bedtools genomecov -ibam {input.bam_md} -d > {output.output_merged_no_dedup}")
+
+
+rule make_coverage_plot_merged:
+    """
+        Create coverage plots 
+    """
+    #report("outputs/coverage/coverage_plots/{intervals}/{sample}.png", caption="report/coverage_plots.rst", category="coverage_plots")
+    group: "ag"
+    conda: workflow.basedir + "/envs/r-covid.yaml"
+    input:    
+        "outputs/coverage/merged/{intervals}/{sample}.cov"
+    output:
+        report("outputs/coverage/merged/coverage_plots/{intervals}/{sample}.png", caption=workflow.basedir+ "/report/coverage_plots.rst", category="coverage_plots/merged_coverage_plots")
+#        report("test.png", caption="report/coverage_plots.rst", category="coverage_plots")
+    shell:
+        "{SCRIPTS_DIR}/make_coverage_plots.R {input} {output} {wildcards.sample}_{wildcards.intervals}"
+   
+rule make_coverage_plots_final:
+    input:
+         coverage_plots_in = expand("outputs/coverage/merged/coverage_plots/{intervals}/{sample}.png",intervals=intervals, sample=mapped_uid.keys()),
+         complete="outputs/final/merged/qc_report.tsv"
+    output:
+         report(directory("outputs/final/merged/coverage_plots/{intervals}/"),patterns=["{sample}.png"],category="coverage_plots/final_coverage_plots",caption=workflow.basedir+ "/report/coverage_plots.rst")
+    run:
+        in_meta = pd.read_csv(input.complete,sep="\t")
+        for coverage_plot in input.coverage_plots_in:
+            base =  os.path.basename(coverage_plot).split(".png")[0]
+            print(in_meta["merged_id"].isin([base]).any(axis=None))
+            if(in_meta["merged_id"].isin([base]).any(axis=None)):
+                shutil.copy(coverage_plot,output[0])

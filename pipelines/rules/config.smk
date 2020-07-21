@@ -1,0 +1,45 @@
+wildcard_constraints: 
+    sample="(?!all)(?!merged)([a-z0-9A-Z-_]+)",
+    intervals="(?!phased)(?!merged)(?!phylo)([a-z0-9A-Z-_]+)",
+    depth="(?!merged)([0-9]+)",
+    uid_lib="(?!merged)([a-z0-9A-Z-_]+)"
+import configparser
+import pyfasta
+SOFTWARE_PATH=config["PATHS"]["SOFTWARE_FOLDER"]
+PICARD_PATH=SOFTWARE_PATH + config["PATHS"]["PICARD_PATH"]
+GATK_PATH=SOFTWARE_PATH + config["PATHS"]["GATK_PATH"]
+SCRIPTS_DIR=config["PATHS"]["SCRIPTS_DIR"]
+REFERENCE=config["PATHS"]["REFERENCE"]
+SARS_REF=config["PATHS"]["SARS_REF"]
+MAPQ_FILT=config["PARAMS"]["MAPQ_FILT"]
+GISAID_FASTA=config["PATHS"]["GISAID_FASTA"]
+GISAID_METADATA=config["PATHS"]["GISAID_METADATA"]
+
+ALL_PRIMERS=config["PATHS"]["ALL_PRIMERS"]
+print(ALL_PRIMERS)
+SITES_TO_MASK=config["PATHS"]["SITES_TO_MASK"]
+OLIGO_POOL_BED=config["PATHS"]["OPOOL_FILE"]
+ARCTIC_FILE=config["PATHS"]["ARCTIC_FILE"]
+
+TAXON_IN=config["PATHS"]["TAXON_ID"]
+
+HAPLOTYPE_CORES=config["PARAMS"]["HAPLOTYPE_CORES"]
+MIN_DEPTH=config["PARAMS"]["MIN_DEPTH"]
+MIN_QUAL=config["PARAMS"]["MIN_QUAL"]
+FRAC_STRAND=config["PARAMS"]["FRAC_STRAND"]
+#DEPTH_ARRAY=range(MIN_DEPTH,MIN_DEPTH*5,MIN_DEPTH)
+
+input_fasta = pyfasta.Fasta(REFERENCE)
+intervals=[config["PARAMS"]["SARS_GENOME_NAME"]]
+
+TRIMMOMATIC_ADAPTERS=config["PATHS"]["TRIMMOMATIC_ADAPTERS"]
+TRIMMOMATIC_PATH=config["PATHS"]["TRIMMOMATIC_PATH"]
+
+BRACKEN_PATH=config["PATHS"]["BRACKEN_PATH"]
+
+ARCTIC_LOCATIONS=config["PATHS"]["ARCTIC_LOCATIONS"]
+
+GISAID_CLADES=config["PATHS"]["GISAID_CLADES"]
+NEXTSTRAIN_CLADES=config["PATHS"]["NEXTSTRAIN_CLADES"]
+SARS2_REF_GENBANK=config["PATHS"]["SARS2_REF_GENBANK"]
+## TODO: ADD MIN_COV

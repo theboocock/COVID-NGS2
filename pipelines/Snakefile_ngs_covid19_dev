@@ -6,56 +6,7 @@
 configfile:  workflow.current_basedir + "/defaults.yaml" 
 CONFIGFILE= workflow.current_basedir + "/defaults.yaml" 
 
-wildcard_constraints: 
-    sample="(?!merged)([a-z0-9A-Z-_]+)",
-    intervals="(?!merged)(?!phylo)([a-z0-9A-Z-_]+)",
-    depth="(?!merged)([0-9]+)",
-    uid_lib="(?!merged)([a-z0-9A-Z-_]+)"
-import configparser
-import pyfasta
-SOFTWARE_PATH=config["PATHS"]["SOFTWARE_FOLDER"]
-PICARD_PATH=SOFTWARE_PATH + config["PATHS"]["PICARD_PATH"]
-GATK_PATH=SOFTWARE_PATH + config["PATHS"]["GATK_PATH"]
-SCRIPTS_DIR=config["PATHS"]["SCRIPTS_DIR"]
-REFERENCE=config["PATHS"]["REFERENCE"]
-SARS_REF=config["PATHS"]["SARS_REF"]
-MAPQ_FILT=config["PARAMS"]["MAPQ_FILT"]
-GISAID_FASTA=config["PATHS"]["GISAID_FASTA"]
-GISAID_METADATA=config["PATHS"]["GISAID_METADATA"]
-
-ALL_PRIMERS=config["PATHS"]["ALL_PRIMERS"]
-print(ALL_PRIMERS)
-SITES_TO_MASK=config["PATHS"]["SITES_TO_MASK"]
-OLIGO_POOL_BED=config["PATHS"]["OPOOL_FILE"]
-ARCTIC_FILE=config["PATHS"]["ARCTIC_FILE"]
-
-TAXON_IN=config["PATHS"]["TAXON_ID"]
-
-HAPLOTYPE_CORES=config["PARAMS"]["HAPLOTYPE_CORES"]
-MIN_DEPTH=config["PARAMS"]["MIN_DEPTH"]
-MIN_QUAL=config["PARAMS"]["MIN_QUAL"]
-FRAC_STRAND=config["PARAMS"]["FRAC_STRAND"]
-#DEPTH_ARRAY=range(MIN_DEPTH,MIN_DEPTH*5,MIN_DEPTH)
-
-input_fasta = pyfasta.Fasta(REFERENCE)
-intervals=[config["PARAMS"]["SARS_GENOME_NAME"]]
-
-TRIMMOMATIC_ADAPTERS=config["PATHS"]["TRIMMOMATIC_ADAPTERS"]
-TRIMMOMATIC_PATH=config["PATHS"]["TRIMMOMATIC_PATH"]
-
-BRACKEN_PATH=config["PATHS"]["BRACKEN_PATH"]
-
-ARCTIC_LOCATIONS=config["PATHS"]["ARCTIC_LOCATIONS"]
-
-GISAID_CLADES=config["PATHS"]["GISAID_CLADES"]
-NEXTSTRAIN_CLADES=config["PATHS"]["NEXTSTRAIN_CLADES"]
-SARS2_REF_GENBANK=config["PATHS"]["SARS2_REF_GENBANK"]
-## TODO: ADD MIN_COV
-#
-#MIN_COVERAGE=config["PARAMS"]["MIN_COV"]
-#intervals=list(input_fasta.keys())
-#intervals = [interval.strip().replace(" ","_").replace(",","") for interval in intervals]
-
+include: "rules/config.smk"
 include: "rules/utils.smk"
 
 depth_range = [int(MIN_DEPTH)]
@@ -99,27 +50,9 @@ except KeyError:
 #    input:
 #        expand("outputs/kraken2/{sample}.kraken_report.txt",sample=samples)
 #
-#print(samples
-
-mapped_sample_names = {}
-for key, value in mapped_uid.items():
-    for val in value:
-        mapped_sample_names[str(val)] = key 
-
-#
-#
-rule phased_final:
-    input:
-        "outputs/final/merged/quasi_species/all.vcf"
-    output:
-        "outputs/quasi_species/merged/phased.vcf.gz"
-    run:
-        shell("java -jar {SOFTWARE_PATH}/beagle/beagle.18May20.d20.jar gt={input} out=test")
-        shell("cp test.vcf.gz {output}")
-
-
 rule all:
     input:
+        expand("outputs/consensus/merged/phased/{intervals}/all_{depth}_none.fasta", depth=depth_range, intervals=intervals),
         "outputs/quasi_species/merged/all_from_merged.vcf",
         "outputs/quasi_species/merged/phased.vcf.gz",
         expand("outputs/mapping_stats/bam_subset/merged/{uid_lib}.bam", uid_lib=mapped_uid.keys()),
@@ -166,23 +99,41 @@ rule all:
         expand("outputs/bcftools_vcfs/merged/filt/{intervals}/all.vcf.gz",intervals=intervals),
         "outputs/final/merged/annovar/all_filtered_annovar_table.txt",
         "outputs/final/merged/quasi_species/all.vcf"
-  #     "outputs/consensus/merged/sars2/all_5.tsv",
+#rule all:
+    #    input:
+        #        expand("outputs/consensus/merged/phased/{intervals}/all_{depth}_none.fasta", depth=depth_range, intervals=intervals),
+#        "outputs/pangolin/lineages_merged.csv"
+
+#print(samples
+
+mapped_sample_names = {}
+for key, value in mapped_uid.items():
+    for val in value:
+        mapped_sample_names[str(val)] = key 
+
+include: "rules/align.smk"
+include: "rules/qc_metrics.smk"
+include: "rules/variant_calling.smk"
+include: "rules/phylogenetics.smk"
 #
-import shutil
-import numpy as np
+#
+
+
+
+
+
+
 rule generate_final_dataset_package:
     input:
         qc_report_in="outputs/qc_report/all.qc",
-        pangolin_out="outputs/pangolin/lineages.csv",
+        pangolin_out="outputs/pangolin/lineages_merged.csv",
         input_consensus = expand("outputs/consensus/merged/{intervals}/all_{depth}.fasta", depth=MIN_DEPTH, intervals=intervals),
         input_consensus_phylo = expand("outputs/consensus/merged/phylo/{intervals}/all_{depth}.fasta", depth=MIN_DEPTH, intervals=intervals),
         read_one = expand("outputs/filtered_fastqs/{intervals}/{sample}.R1.fastq.gz",intervals=intervals,sample=samples),
         read_two = expand("outputs/filtered_fastqs/{intervals}/{sample}.R2.fastq.gz",intervals=intervals, sample=samples),
         depleted_read_one = expand("outputs/depleted_fastqs/human/{sample}.R1.fastq.gz",sample=samples),
         depleted_read_two = expand("outputs/depleted_fastqs/human/{sample}.R2.fastq.gz", sample=samples),
-        merged_vcf = "outputs/bcftools_vcfs/merged/filt/sars2/all.vcf.gz",
-        nextstrain_clade="outputs/clades/nextstrain/lineages.csv",
-        gisaid_clades="outputs/clades/gisaid/lineages.csv"
+        merged_vcf = "outputs/bcftools_vcfs/merged/filt/sars2/all.vcf.gz"
     output:
         merged_csv=report("outputs/final/merged/qc_report.tsv",category="qc_reports/final",caption=workflow.basedir + "/report/coverage_plots.rst"),
         merged_csv_unfiltered=report("outputs/qc_report/merged/qc_report.tsv",category="qc_reports/merged",caption=workflow.basedir + "/report/coverage_plots.rst"),
@@ -195,16 +146,12 @@ rule generate_final_dataset_package:
         phylo_fasta="outputs/final/merged/phylo/all.fasta"
     run:
         # Let's create the QC table for the merged libraries.
-        #
         ## Temaplate for the pandas.
-        #
-        #
         df = pd.DataFrame(columns=metadata.columns)
         df = df.drop(columns=["sample","strain","lib_name","fastq_one","fastq_two","run_name"])
         all_qc = pd.read_csv(input.qc_report_in,sep=" ")
-        print(all_qc)
+        #### create new column that is a str split version
         md_m= metadata.merge(all_qc,left_on="sample",right_on="sample")
-        print(md_m)
         #pango_in = pd.read_csv(input.pangolin_out,sep=",")
         #md_m = md_m.merge(pango_in,left_on="strain",right_on="taxon",how="outer")
         md_m = md_m.fillna(value="NA")
@@ -242,7 +189,7 @@ rule generate_final_dataset_package:
         out_df["sars2_percent_dup"] = out_df["mapped_sars2_dup"]/out_df["total_read_count"]
         out_df["sars2_percent_dedup"] = out_df["mapped_sars2_dedup"]/out_df["total_read_count"]
         #out_df["sars2_percent"] = out_df["mapped_sars2"]/(out_df["mapped_human"] + out_df["mapped_rrna"] + out_df["mapped_sars2"]) * 100
-        pango_in = pd.read_csv(input.pangolin_out, sep=",")
+        pango_in = pd.read_csv(input.pangolin_out, sep="\t")
         out_df = out_df.merge(coverage_5x_df, left_on="merged_id", right_on="merged_id", how="outer")
         out_df = out_df.merge(library_df, left_on="merged_id", right_on="merged_id", how="outer")
         out_df = out_df.merge(pango_in, left_on="read_group_name", right_on="taxon", how="outer")
@@ -250,12 +197,8 @@ rule generate_final_dataset_package:
         ####
         #nextstrain_clade="outputs/clades/nextstrain/lineages.csv",
         #gisaid_clades="outputs/clades/gisaid/lineages.csv"
-        nextstrain_in = pd.read_csv(input.nextstrain_clade,sep="\t",skiprows=1,names=["read_group_name","nextstrain_clade","nextstrain_parent_clade"]) 
-        gisaid_in =  pd.read_csv(input.gisaid_clades,sep="\t",skiprows=1, names=["read_group_name","gisaid_clade","gisaid_parent_clade"]) 
  
         ##nextstrain_in = pd.read_csv(input.nextstrain_clade,sep="\t",header=True,skiprows=1,names=["read_group_name","gisaid_clade","gisaid_parent_clade"]) 
-        out_df = out_df.merge(nextstrain_in, left_on="read_group_name", right_on="read_group_name",how="outer")
-        out_df = out_df.merge(gisaid_in, left_on="read_group_name", right_on="read_group_name",how="outer")
         ### Rename columns to nextstrain.
         #
         #
@@ -263,7 +206,8 @@ rule generate_final_dataset_package:
         ## Now merged with metadata .... ### 
         out_df = out_df.merge(metadata,left_on="uid_lib",right_on="id_library_type")
         out_df = out_df.drop_duplicates(subset=["uid_lib"])
-        out_df =  out_df.drop(columns=["sample","strain","lib_name","fastq_one","fastq_two","run_name"])
+        print(list(out_df.columns))
+        out_df =  out_df.drop(columns=["sample_x","sample_y","strain","lib_name","fastq_one","fastq_two","run_name"])
         out_df=out_df.fillna(value="NA")
         sample_name_fasta_vcf = [key.replace("_","-") for key in mapped_uid.keys() ]
         out_df["sample_name_fasta"] = sample_name_fasta_vcf
@@ -308,56 +252,6 @@ rule generate_final_dataset_package:
 
 
 
-rule generate_coverage_plot_merged:
-    """
-        #TODO: rename rule
-        Use bedtools to get depth per bp.
-    
-    """
-    resources:
-        mem_mb=16000,
-        walltime=43200
-    shadow: "minimal"
-    group: "ag"
-    input:
-        bam="outputs/mapping_stats/bam_subset/merged/{sample}.bam",
-        bam_md="outputs/mapping_stats/bam_subset/merged/{sample}.amplicon.bam",
-    output:
-        output_merged="outputs/coverage/merged/{intervals}/{sample}.cov",
-        output_merged_no_dedup="outputs/coverage/merged/{intervals}/{sample}.no_dedup.cov"
-    run:
-        shell("bedtools genomecov -ibam {input.bam} -d > {output.output_merged}")
-        shell("bedtools genomecov -ibam {input.bam_md} -d > {output.output_merged_no_dedup}")
-
-
-rule make_coverage_plot_merged:
-    """
-        Create coverage plots 
-    """
-    #report("outputs/coverage/coverage_plots/{intervals}/{sample}.png", caption="report/coverage_plots.rst", category="coverage_plots")
-    group: "ag"
-    conda: workflow.basedir + "/envs/r-covid.yaml"
-    input:    
-        "outputs/coverage/merged/{intervals}/{sample}.cov"
-    output:
-        report("outputs/coverage/merged/coverage_plots/{intervals}/{sample}.png", caption=workflow.basedir+ "/report/coverage_plots.rst", category="coverage_plots/merged_coverage_plots")
-#        report("test.png", caption="report/coverage_plots.rst", category="coverage_plots")
-    shell:
-        "{SCRIPTS_DIR}/make_coverage_plots.R {input} {output} {wildcards.sample}_{wildcards.intervals}"
-   
-rule make_coverage_plots_final:
-    input:
-         coverage_plots_in = expand("outputs/coverage/merged/coverage_plots/{intervals}/{sample}.png",intervals=intervals, sample=mapped_uid.keys()),
-         complete="outputs/final/merged/qc_report.tsv"
-    output:
-         report(directory("outputs/final/merged/coverage_plots/{intervals}/"),patterns=["{sample}.png"],category="coverage_plots/final_coverage_plots",caption=workflow.basedir+ "/report/coverage_plots.rst")
-    run:
-        in_meta = pd.read_csv(input.complete,sep="\t")
-        for coverage_plot in input.coverage_plots_in:
-            base =  os.path.basename(coverage_plot).split(".png")[0]
-            print(in_meta["merged_id"].isin([base]).any(axis=None))
-            if(in_meta["merged_id"].isin([base]).any(axis=None)):
-                shutil.copy(coverage_plot,output[0])
 
 #rule generate_filtered_data:
 #    input:
@@ -393,7 +287,3 @@ rule make_coverage_plots_final:
 #            shell("touch {output.complete}")
 #
 
-include: "rules/align.smk"
-include: "rules/qc_metrics.smk"
-include: "rules/variant_calling.smk"
-include: "rules/phylogenetics.smk"

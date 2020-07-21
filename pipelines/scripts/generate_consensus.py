@@ -109,12 +109,16 @@ def get_consensus_fasta(reference_genome, sample, output_consensus, output_cov, 
     if phased:
         output_consensus_final = output_consensus.split(".fasta")[0]+ "_2.fasta"
         sample_cmd = __BCFTOOLS_SAMPLE_TEMPLATE__.format(quasi_vcf, sample)
+        print(sample_cmd)
         subprocess.check_call(sample_cmd,shell=True)
         set_one="""bcftools consensus -f {reference} -m vcf_mask_invert.bed -H 1 -s {sample} -o {output_consensus} sample.vcf.gz """.format(sample=sample, output_consensus=output_consensus, reference=reference_genome)
         set_two ="""bcftools consensus -f {reference} -m vcf_mask_invert.bed -H 2 -s {sample} -o {output_consensus} sample.vcf.gz """.format(sample=sample, output_consensus=output_consensus_final,reference=reference_genome) 
         print(set_one)
-        subprocess.check_call(set_one,shell=True)
-        subprocess.check_call(set_two,shell=True)
+        try:
+            subprocess.check_call(set_one,shell=True)
+            subprocess.check_call(set_two,shell=True)
+        except:
+            pass
     else:
         subprocess.check_call("cat vcf_mask_invert.bed vcf_het.bed | sort -k 2,2g | bedtools merge -i stdin > vcf_het_mask_invert.bed",shell=True)
         con_cmd = __BCFTOOLS_CONSENSUS_TEMPLATE__.format(sample, reference_genome, "con.fasta")
@@ -126,8 +130,8 @@ def get_consensus_fasta(reference_genome, sample, output_consensus, output_cov, 
                         out_f.write(">" + sample + "\n")
                     else:
                         out_f.write(line)
-    cov_cmd =__BIOAWK_COV__.format(output_consensus, output_cov)
-    subprocess.check_call(cov_cmd, shell=True)
+        cov_cmd =__BIOAWK_COV__.format(output_consensus, output_cov)
+        subprocess.check_call(cov_cmd, shell=True)
 
 def main():
     parser = argparse.ArgumentParser(description="Process joint VCF and generate consensus fastas from biallelic sites only")
