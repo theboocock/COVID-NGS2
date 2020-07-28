@@ -34,7 +34,7 @@ meta_in = config["sample_list"]
 #
 metdata_dedup = metadata[metadata["coverage_mean_dedup"] > 200].head(n=60)
 
-downsampled = [0.1,0.5,1.0,2.0,3.0,4.0,5.0,10.0,20.0,30.0,250.0]
+downsamples= [0.1,0.5,1.0,2.0,3.0,4.0,5.0,10.0,20.0,30.0,250.0]
 
 def get_mean_coverage(wildcards):
     print(wildcards.sample)
