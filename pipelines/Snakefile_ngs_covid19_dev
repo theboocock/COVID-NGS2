@@ -46,60 +46,60 @@ except KeyError:
 #        print(items)
 #        out_f.write(str(key) + " " + " ".join([str(o) for o in items]) + "\n")
 #samples=["2011"]
-#rule all:
-#    input:
-#        "outputs/qc_report/qc_report.tsv"
-
-
 rule all:
     input:
-        expand("outputs/consensus/merged/phased/{intervals}/all_{depth}_none.fasta", depth=depth_range, intervals=intervals),
-        "outputs/quasi_species/merged/all_from_merged.vcf",
-        "outputs/quasi_species/merged/phased.vcf.gz",
-        expand("outputs/mapping_stats/bam_subset/merged/{uid_lib}.bam", uid_lib=mapped_uid.keys()),
-        "outputs/amplicon_qc/umi/amplicon_df.txt",
-        expand("outputs/mapping_stats/md/merged/{uid_lib}.bam", uid_lib=mapped_uid.keys()),
-        #expand("outputs/kraken2/{sample}.kraken_report.txt",sample=samples),
-        expand("outputs/consensus/merged/{intervals}/all_{depth}.fasta", depth=depth_range, intervals=intervals),
-        expand("outputs/abundances/merged/{sample}.bracken", sample=mapped_uid.keys()), 
-        expand("outputs/coverage/merged/coverage_plots/{intervals}/{sample}.png", intervals=intervals, sample=mapped_uid.keys()), 
-        expand("outputs/mapping_stats/bam_subset/{sample}.bam", sample=samples),
-        "outputs/ncov/merged/all.fasta",
-        "outputs/bcftools_vcfs/merged/all.vcf.gz",
-        "outputs/quasi_species/merged/all.vcf",
-#        expand("outputs/raw_fastqs/{sample}.R1.fastq.gz",sample=samples),
-       # TODO check if it works#
-      #"test.png",
-        expand("outputs/coverage/coverage_plots/{intervals}/{sample}.png", intervals=intervals, sample=samples), 
-        #expand("outputs/kraken_bams/{intervals}/{sample}.kraken.bam",intervals=intervals,sample=samples),
-        #expand("outputs/kraken_bams/{intervals}/{sample}.kraken.bam",sample=samples,intervals=intervals),
-        #expand("outputs/vcfs_filt/{intervals}/all.filt.vcf.gz",intervals=intervals),
-        #expand("outputs/consensus/{depth}/{intervals}/{sample}.fasta",depth=depth_range,sample=samples,intervals=intervals),
-        #expand("outputs/coverage/{depth}/{intervals}/{sample}.cov", depth=depth_range, sample=samples, intervals=intervals),
-        expand("outputs/coverage/{intervals}/{sample}.cov", sample=samples,intervals=intervals),
-        #expand("outputs/insert_sizes/{intervals}/{sample}.insert_sizes",sample=samples,intervals=intervals),
-        expand("outputs/consensus/{intervals}/all_{depth}.fasta", depth=depth_range, intervals=intervals),
-        #expand("outputs/abundances/{sample}.bracken",sample=samples),
-        #"{SCRIPTS_DIR}/quick_align.sh '{params.rg}' {SARS_REF} {input.read_one} {input.read_two} {output} {log}" 
-        expand("outputs/consensus/bams/{intervals}/{sample}/{depth}.bam",intervals=intervals,sample=samples, depth=depth_range),
-        expand("outputs/depleted_fastqs/human/{sample}.R1.fastq.gz",sample=samples),
-       # bai="outputs/consensus/bams/{intervals}/{sample}/{depth}.bam.bai"
-        #expand("outputs/igv-report/{intervals}/{sample}.html", intervals=intervals, sample=samples),
-        # TODO: Reimplement the mapping from 
-        #
-        # TODO: Combinne all sample information we can gather from the sequencing into a single file. 
-        "outputs/amplicon_qc/amplicon_df.txt",
-        "outputs/amplicon_qc/amplicon_merged_df.txt",
-        "outputs/final/abundances.bracken",
-        "outputs/pangolin/lineages.csv",
-        #"outputs/final/qc_report.tsv",
-        "outputs/qc_report/qc_report.tsv",
-        directory(expand("outputs/final/merged/coverage_plots/{intervals}/",intervals=intervals)),
-        #""outputs/final/filtered/metadata.csv",
-        "outputs/final/merged/qc_report.tsv",
-        expand("outputs/bcftools_vcfs/merged/filt/{intervals}/all.vcf.gz",intervals=intervals),
-        "outputs/final/merged/annovar/all_filtered_annovar_table.txt",
-        "outputs/final/merged/quasi_species/all.vcf"
+        "outputs/finished.txt"
+
+
+#rule all:
+#    input:
+#        expand("outputs/consensus/merged/phased/{intervals}/all_{depth}_none.fasta", depth=depth_range, intervals=intervals),
+#        "outputs/quasi_species/merged/all_from_merged.vcf",
+#        "outputs/quasi_species/merged/phased.vcf.gz",
+#        expand("outputs/mapping_stats/bam_subset/merged/{uid_lib}.bam", uid_lib=mapped_uid.keys()),
+#        "outputs/amplicon_qc/umi/amplicon_df.txt",
+#        expand("outputs/mapping_stats/md/merged/{uid_lib}.bam", uid_lib=mapped_uid.keys()),
+#        #expand("outputs/kraken2/{sample}.kraken_report.txt",sample=samples),
+#        expand("outputs/consensus/merged/{intervals}/all_{depth}.fasta", depth=depth_range, intervals=intervals),
+#        expand("outputs/abundances/merged/{sample}.bracken", sample=mapped_uid.keys()), 
+#        expand("outputs/coverage/merged/coverage_plots/{intervals}/{sample}.png", intervals=intervals, sample=mapped_uid.keys()), 
+#        expand("outputs/mapping_stats/bam_subset/{sample}.bam", sample=samples),
+#        "outputs/ncov/merged/all.fasta",
+#        "outputs/bcftools_vcfs/merged/all.vcf.gz",
+#        "outputs/quasi_species/merged/all.vcf",
+##        expand("outputs/raw_fastqs/{sample}.R1.fastq.gz",sample=samples),
+#       # TODO check if it works#
+#      #"test.png",
+#        expand("outputs/coverage/coverage_plots/{intervals}/{sample}.png", intervals=intervals, sample=samples), 
+#        #expand("outputs/kraken_bams/{intervals}/{sample}.kraken.bam",intervals=intervals,sample=samples),
+#        #expand("outputs/kraken_bams/{intervals}/{sample}.kraken.bam",sample=samples,intervals=intervals),
+#        #expand("outputs/vcfs_filt/{intervals}/all.filt.vcf.gz",intervals=intervals),
+#        #expand("outputs/consensus/{depth}/{intervals}/{sample}.fasta",depth=depth_range,sample=samples,intervals=intervals),
+#        #expand("outputs/coverage/{depth}/{intervals}/{sample}.cov", depth=depth_range, sample=samples, intervals=intervals),
+#        expand("outputs/coverage/{intervals}/{sample}.cov", sample=samples,intervals=intervals),
+#        #expand("outputs/insert_sizes/{intervals}/{sample}.insert_sizes",sample=samples,intervals=intervals),
+#        expand("outputs/consensus/{intervals}/all_{depth}.fasta", depth=depth_range, intervals=intervals),
+#        #expand("outputs/abundances/{sample}.bracken",sample=samples),
+#        #"{SCRIPTS_DIR}/quick_align.sh '{params.rg}' {SARS_REF} {input.read_one} {input.read_two} {output} {log}" 
+#        expand("outputs/consensus/bams/{intervals}/{sample}/{depth}.bam",intervals=intervals,sample=samples, depth=depth_range),
+#        expand("outputs/depleted_fastqs/human/{sample}.R1.fastq.gz",sample=samples),
+#       # bai="outputs/consensus/bams/{intervals}/{sample}/{depth}.bam.bai"
+#        #expand("outputs/igv-report/{intervals}/{sample}.html", intervals=intervals, sample=samples),
+#        # TODO: Reimplement the mapping from 
+#        #
+#        # TODO: Combinne all sample information we can gather from the sequencing into a single file. 
+#        "outputs/amplicon_qc/amplicon_df.txt",
+#        "outputs/amplicon_qc/amplicon_merged_df.txt",
+#        "outputs/final/abundances.bracken",
+#        "outputs/pangolin/lineages.csv",
+#        #"outputs/final/qc_report.tsv",
+#        "outputs/qc_report/qc_report.tsv",
+#        directory(expand("outputs/final/merged/coverage_plots/{intervals}/",intervals=intervals)),
+#        #""outputs/final/filtered/metadata.csv",
+#        "outputs/final/merged/qc_report.tsv",
+#        expand("outputs/bcftools_vcfs/merged/filt/{intervals}/all.vcf.gz",intervals=intervals),
+#        "outputs/final/merged/annovar/all_filtered_annovar_table.txt",
+#        "outputs/final/merged/quasi_species/all.vcf"
 #rule all:
     #    input:
         #        expand("outputs/consensus/merged/phased/{intervals}/all_{depth}_none.fasta", depth=depth_range, intervals=intervals),
