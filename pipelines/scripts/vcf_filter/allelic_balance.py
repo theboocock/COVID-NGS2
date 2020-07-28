@@ -42,12 +42,10 @@ def vcf_input_filter(vcf_file,lower, upper, vcf_outfile):
 
             out_f.write(str(record_id) + "\t")
             out_f.write(str(rec.ref) + "\t")
-            out_f.write(str(",".join(rec.alts)) + "\t")
             if rec.qual is None:
                 record_qual = "."
             else:
-                record_qual = rec.qual
-            out_f.write(str(int(record_qual)) + "\t")
+                record_qual = int(rec.qual)
             if rec.filter is None:
                 record_filter = "." 
             else:
@@ -56,6 +54,33 @@ def vcf_input_filter(vcf_file,lower, upper, vcf_outfile):
                     record_filter = "." 
                 else:
                     record_filter = rec.filter.keys()[0]
+            try:
+                out_f.write(str(",".join(rec.alts)) + "\t")
+            except:
+                out_f.write(".\t")
+                out_f.write(str((record_qual)) + "\t")
+                out_f.write(str(record_filter) + "\t")
+                info_keys=(list(rec.info))
+                info_str = ";".join([key  +"=" + str(rec.info[key]) for key in info_keys])
+                out_f.write(str(info_str) + "\t")
+                out_f.write(str(":".join(rec.format)) + ":AR" + "\t")
+                for sample_idx, keys in enumerate(rec.samples.items()):
+                    sample = keys[1]
+                    gt = sample["GT"] 
+                    # TODO: make sure to extract the relevant information from the reference
+                    if gt[0] == None:
+                        gt = "./."
+                        ratio = "."
+                    else:
+                        gt = "0/0"
+                        ratio = "0"
+                    out_f.write(gt +":.:.:"+ratio)
+                    keys = sample.keys()[1:]
+                    if sample_idx != (len(rec.samples.keys()) -1):
+                        out_f.write("\t")
+                out_f.write("\n")
+                continue 
+            out_f.write(str((record_qual)) + "\t")
             out_f.write(str(record_filter) + "\t")
             info_keys=(list(rec.info))
             info_str = ";".join([key  +"=" + str(rec.info[key]) for key in info_keys])

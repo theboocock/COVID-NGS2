@@ -42,10 +42,15 @@ def combine_qc(map_stat_in,coverage_in, insert_size_line,output_file, complete_c
                         with open(mapstat_md) as map_stat_md_sars:
                             with open(no_dedup_cov) as no_dedup_cov_out:
                                 cov_total = 0
+                                ### Depth 5x
+                                coverage_5x = 0
                                 for i, line in enumerate(coverage_full):
                                     s_line = line.split("\t")
                                     cov = int(s_line[2])
+                                    if (cov >= 5):
+                                        coverage_5x +=1
                                     cov_total += cov
+                                coverage_5x = coverage_5x/(i * 1.0)
                                 cov_mean = str(cov_total / ( i * 1.0))
                                 cov_total = 0
                                 for i, line in enumerate(no_dedup_cov_out):
@@ -59,7 +64,7 @@ def combine_qc(map_stat_in,coverage_in, insert_size_line,output_file, complete_c
                                 read_count = str(int(read_count_in.readline().strip())/2)
                                 mapstat_md_sars_number= str(int(map_stat_md_sars.readline().strip()))
                                 out_f.write(coverage + " "  + cov_mean+ " " + cov_mean_no_dedup + " " + map_stat_in + " " + read_count + " "+ 
-                                        mapstat_md_sars_number  + " " + insert_size_line+ "\n")
+                                        mapstat_md_sars_number  + " " + insert_size_line + " "+ str(coverage_5x)+ "\n")
 
 
 

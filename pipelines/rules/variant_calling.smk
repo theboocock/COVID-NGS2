@@ -89,8 +89,6 @@ rule joint_call_vcfs:
         shell("bcftools view -e 'QUAL < {MIN_QUAL}' test.vcf.gz | bgzip -c > test1.vcf.gz")
         shell("{SCRIPTS_DIR}/vcf_filter/allelic_balance.py --vcf test1.vcf.gz -o {output}")
 
-rule beagle_phasing:
-    group: "beagle_phasing"
 
 
 

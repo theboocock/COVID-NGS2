@@ -4,9 +4,9 @@ KRAKEN2_DB=config["PATHS"]["KRAKEN2_DB"]
 
 import os
 
-
-
 rule raw_fastqs:
+    message:
+        "Archive raw fastq files"
     input:
         read_one=get_fq1,
         read_two=get_fq2
@@ -17,6 +17,8 @@ rule raw_fastqs:
         "cp {input.read_one} {output.out_fastq_one} && cp {input.read_two} {output.out_fastq_two}"
 
 rule count_reads:
+    message:
+        "Count the total number of reads pairs in a library"
     input:
         read_one=get_fq1,
     output:
@@ -25,6 +27,8 @@ rule count_reads:
         "zcat {input} | wc -l > {output}"
 
 rule trim_reads:
+    message:
+        "Trim read if they were created using the amplicon method"
     conda: workflow.basedir + "/envs/r-covid.yaml"
     input:
         read_one=get_fq1,
@@ -471,6 +475,7 @@ rule merged_bams:
     params:
         rg=get_sample_name_for_merge    
     run:
+        print(input)
         if len(input.bams) != 1:
             # Skip merge
             shell("samtools merge tmp.bam {input.bams} && samtools sort tmp.bam > sorted.bam")

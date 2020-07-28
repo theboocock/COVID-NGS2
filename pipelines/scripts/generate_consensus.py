@@ -58,8 +58,15 @@ AWK_VCF_KEEP_POSITIONS="""
     zcat {0} | grep -v "#" | awk 'BEGIN{{OFS="\t"}}{{print "sars2",$2-1,$2}}' | bedtools merge -i stdin >  vcf_mask.bed
 """
 
+
+### Remove all het sites for biallelic sites # Shouldprobably make it work for tri-allelic sites
 AWK_GET_HET_POSITIONS="""
-    zcat {0} | grep -v "#" | grep "0/1:" |  awk 'BEGIN{{OFS="\t"}}{{print "sars2",$2-1,$2}}'  > vcf_het.bed
+    zcat {0} | grep -v "#" | grep "0/1:\|0/2:\|1/2" |  awk 'BEGIN{{OFS="\t"}}{{print "sars2",$2-1,$2}}'  > vcf_het.bed
+"""
+
+
+AWK_GET_MISSING_POSITIONS="""
+    zcat {0} | grep -v "#" | grep "\./\.:" |  awk 'BEGIN{{OFS="\t"}}{{print "sars2",$2-1,$2}}'  > vcf_missing.bed
 """
 
 def get_masking_bed_vcf(vcf_gz):
@@ -87,14 +94,13 @@ def get_sample_vcf(vcf_gz, sample,quasi_vcf):
     subprocess.check_call(sample_cmd,shell=True)
     het_cmd = AWK_GET_HET_POSITIONS.format("sample.vcf.gz") 
     subprocess.check_call(het_cmd,shell=True)
-    
     sample_cmd = __BCFTOOLS_SAMPLE_TEMPLATE__.format(vcf_gz, sample)
     subprocess.check_call(sample_cmd,shell=True)
 
 import shutil
 invert_bed = "bedtools subtract -a tmp.bed -b vcf_mask.bed > vcf_mask_invert.bed"
 ### ignore het sites ##  
-def get_consensus_fasta(reference_genome, sample, output_consensus, output_cov, snps_to_exclude_bed,phased,quasi_vcf):
+def get_consensus_fasta(reference_genome, sample, output_consensus, output_cov, snps_to_exclude_bed,phased,quasi_vcf,imputted):
 
     #if snps_to_exclude_bed is not None:
     #    merged_bed_cmd = __BEDTOOLS_MERGE__.format("mask.bed",snps_to_exclude_bed)
@@ -104,8 +110,7 @@ def get_consensus_fasta(reference_genome, sample, output_consensus, output_cov, 
 
     with open("tmp.bed","w") as out_f:
         out_f.write("sars2\t0\t29903\n")
-    subprocess.check_call(invert_bed,shell=True) 
-
+    subprocess.check_call(invert_bed,shell=True)
     if phased:
         output_consensus_final = output_consensus.split(".fasta")[0]+ "_2.fasta"
         sample_cmd = __BCFTOOLS_SAMPLE_TEMPLATE__.format(quasi_vcf, sample)
@@ -120,9 +125,20 @@ def get_consensus_fasta(reference_genome, sample, output_consensus, output_cov, 
         except:
             pass
     else:
-        subprocess.check_call("cat vcf_mask_invert.bed vcf_het.bed | sort -k 2,2g | bedtools merge -i stdin > vcf_het_mask_invert.bed",shell=True)
-        con_cmd = __BCFTOOLS_CONSENSUS_TEMPLATE__.format(sample, reference_genome, "con.fasta")
-        subprocess.check_call(con_cmd,shell=True)
+        if imputted:
+            sample_cmd = __BCFTOOLS_SAMPLE_TEMPLATE__.format(quasi_vcf, sample)
+            subprocess.check_call(sample_cmd,shell=True)
+            sample_cmd = AWK_GET_MISSING_POSITIONS.format("sample.vcf.gz", sample)
+            subprocess.check_call(sample_cmd,shell=True)
+            set_one="""bcftools consensus -f {reference} -m vcf_missing.bed -s {sample} -o {output_consensus} sample.vcf.gz """.format(sample=sample, output_consensus="con.fasta", reference=reference_genome)
+            try:
+                subprocess.check_call(set_one,shell=True)
+            except:
+                pass
+        else:
+            subprocess.check_call("cat vcf_mask_invert.bed vcf_het.bed | sort -k 2,2g | bedtools merge -i stdin > vcf_het_mask_invert.bed",shell=True)
+            con_cmd = __BCFTOOLS_CONSENSUS_TEMPLATE__.format(sample, reference_genome, "con.fasta")
+            subprocess.check_call(con_cmd,shell=True)
         with open("con.fasta") as con:
             with open(output_consensus,'w') as out_f:
                 for line in con:
@@ -149,6 +165,7 @@ def main():
     parser.add_argument("-c","--coverage-output",dest="coverage_output", help="Coverage output", required=True)
     parser.add_argument("--phased",dest="phased",action="store_true",help="Phased")
     parser.add_argument("--coverage-in", dest="coverage_in",help="Coverage input", required=True)
+    parser.add_argument("--imputted",dest="imputted",help="Imputted",action="store_true",default=False) 
     args = parser.parse_args()
     vcf_gz = args.vcf_gz
     min_depth = int(args.min_depth)
@@ -163,9 +180,10 @@ def main():
     coverage_in = args.coverage_in
     quasi_vcf = args.quasi_vcf
     phased = args.phased
+    imputted = args.imputted
     get_sample_vcf(vcf_gz=vcf_gz, sample=sample,quasi_vcf=quasi_vcf)
     #get_masking_bed(bam_input, min_depth, max_strand_prop,coverage_in) 
     get_masking_bed_vcf(vcf_gz)
-    get_consensus_fasta(reference,sample, output_fasta, coverage_output, snps_to_exclude,phased, quasi_vcf)
+    get_consensus_fasta(reference,sample, output_fasta, coverage_output, snps_to_exclude,phased, quasi_vcf, imputted)
 if __name__=="__main__":
     main()

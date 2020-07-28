@@ -28,7 +28,7 @@ if __name__ == '__main__':
     group.add_argument("--alignment", help="*aligned* FASTA file of SARS-CoV-2 sequences relative to Wuhan-HU-1 with insertions removed")
     parser.add_argument("--output", type=str, default='clade_assignment.tsv', help="tsv file to write clade definitions to")
     parser.add_argument("--keep-temporary-files", action='store_true', help="don't clean up")
-    parser.add_argument("--chunk-size", default=10, type=int, help="process this many sequences at once")
+    parser.add_argument("--chunk-size", default=40, type=int, help="process this many sequences at once")
     parser.add_argument("--nthreads", default=1, type=int, help="Number of threads to use in alignment")
     parser.add_argument("--clade-definitions",dest="clades",help="Clade definitions")
     parser.add_argument("--reference-input",dest="reference_input",help="Reference input file")
@@ -65,7 +65,6 @@ if __name__ == '__main__':
                     chunk.append(seq)
                 except StopIteration:
                     done = True
-
             print(f"writing {len(chunk)} and the reference sequence to file '{in_fname}' for alignment.")
             with open(in_fname, 'wt') as fh:
                 SeqIO.write(chunk, fh, 'fasta')
@@ -74,7 +73,8 @@ if __name__ == '__main__':
                                  reference_name=None, reference_sequence=refname,
                                  nthreads=args.nthreads, remove_reference=False,
                                  existing_alignment=False, debug=False, fill_gaps=False)
-
+            if done:
+                break
             augur_align(aln_args)
             alignment = AlignIO.read(out_fname, 'fasta')
         else:

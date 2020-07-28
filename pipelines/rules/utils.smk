@@ -41,7 +41,7 @@ def uid_library_to_sample_hash(merge_rule="uid_type"):
     elif merge_rule == "column_uid_sample_type":
         #   print("HERE")
         id_library_type = metadata["uid_sample_type"]
-    #print(id_library_type)
+
     metadata["id_library_type"] = id_library_type
     unique_id_library_type = list(pd.unique(metadata["id_library_type"]))
     mapped_uids_library = {} 

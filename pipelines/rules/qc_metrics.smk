@@ -117,7 +117,7 @@ rule ag_qc_output:
         "outputs/qc_report/all.qc"
     run:
         with open(output[0],"w") as out_f:
-            out_f.write("sample coverage_3x coverage_mean_dedup coverage_mean_dup mapped_human mapped_rrna mapped_sars2_dedup unmapped total_read_count mapped_sars2_dup median_insert_size mad_isert_size sars2_percent_dedup sars2_percent_dup\n") 
+            out_f.write("sample coverage_3x coverage_mean_dedup coverage_mean_dup mapped_human mapped_rrna mapped_sars2_dedup unmapped total_read_count mapped_sars2_dup median_insert_size mad_insert_size coverage_5x sars2_percent_dedup sars2_percent_dup\n") 
             for f in input:
                 sample = os.path.basename(f).split(".qc")[0]
                 with open(f) as in_f:
@@ -142,7 +142,7 @@ rule merge_meta_data:
         in_qc = "outputs/qc_report/all.qc",
         pangolin_in = "outputs/pangolin/lineages.csv"
     output:
-        "outputs/final/qc_report.tsv"
+        "outputs/final/gc_report.tsv"
     run:
         in_qc = pd.read_csv(input[0], sep=" ")
         md_m= metadata.merge(in_qc,left_on="sample",right_on="sample")

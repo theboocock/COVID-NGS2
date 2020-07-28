@@ -13,26 +13,12 @@ depth_range = [int(MIN_DEPTH)]
 min_cov = 0.8
 
 taxon_dict = read_taxid(TAXON_IN)
-metadata=fastq_match(config)
+print(config["sample_list"])
+metadata = pd.read_csv(config["sample_list"],sep="\t")
+meta_in = config["sample_list"]
 #type_uid 
 #metadata = metadata[metadata["sample"].isin([72,83,107,131,367])]
-samples=metadata["sample"]
 # uid type merges libraries across samples
-try:
-    if config["merge_rule"] == "uid_type": 
-        mapped_uid, sample_names_hash, mapped_uids_read_one, mapped_uids_read_two = uid_library_to_sample_name_and_readgroup()
-    # merges all libraries by uid
-    elif config["merge_rule"] == "uid":
-        #  print("HERE")
-        mapped_uid, sample_names_hash, mapped_uids_read_one, mapped_uids_read_two = uid_library_to_sample_name() 
-    elif config["merge_rule"] == "uid_oligo":
-        mapped_uid, sample_names_hash, mapped_uids_read_one, mapped_uids_read_two = uid_library_to_sample_hash(merge_rule="uid_oligo") 
-    elif config["merge_rule"] == "column_uid_sample_type":
-        mapped_uid, sample_names_hash, mapped_uids_read_one, mapped_uids_read_two = uid_library_to_sample_hash(merge_rule="column_uid_sample_type")
-except KeyError:
-    mapped_uid, sample_names_hash, mapped_uids_read_one, mapped_uids_read_two = uid_library_to_sample_name_and_readgroup()
-    pass
-
 ### ###
 
 ### Downsampling rules ### 
@@ -45,53 +31,193 @@ except KeyError:
 #
 #
 #
-metdata_dedup = metadat[metdata["coverage_mean_dedup"] > 30]
-print(metdata_dedup))
-
-# Downsample height #
 #
+metdata_dedup = metadata[metadata["coverage_mean_dedup"] > 200].head(n=60)
 
-downsamples = [0.1,0.5.1.0,2.0,5,10,20,30]
+downsampled = [0.1,0.5,1.0,2.0,3.0,4.0,5.0,10.0,20.0,30.0,250.0]
 
+def get_mean_coverage(wildcards):
+    print(wildcards.sample)
+    cov = metdata_dedup[metdata_dedup["merged_id"] == wildcards.sample]
+    return cov["coverage_mean_dedup"] 
+
+def get_pango_in_all(wildcards):
+    return(f"outputs/consensus/merged/phased/sars2/all_{MIN_DEPTH}_none.fasta")
+def get_sample_depth(wildcards):
+    return wildcards.sample +  "_"  +  str(wildcards.down)
 rule all:
     input:
-        expand("outputs/consensus/imputed/sars2/imputed/{sample}_{down}.fasta",sample=mapped_uid.keys(),down=downsamples)
+        #expand("outputs/consensus/imputed/sars2/imputed/{sample}_{down}.fasta",sample=mapped_uid.keys(),down=downsamples)
+        expand("outputs/downsamples/{sample}_{down}.bam",sample=metdata_dedup["merged_id"],down=downsamples),
+        "outputs/quasi_species/merged/all.vcf",
+        "outputs/impute/merged/all.vcf.gz",
+        #expand("outputs/vcf/filter/{sample}_{down}.vcf.gz", sample=metdata_dedup["merged_id"],down=downsamples) 
+        expand("outputs/consensus/merged/{sample}_{down}.fasta",sample=metdata_dedup["merged_id"],down=downsamples),
+        expand("outputs/consensus/imputted/{sample}_{down}.fasta",sample=metdata_dedup["merged_id"],down=downsamples),
+        "outputs/pangolin/imputted.csv",
+        "outputs/pangolin/raw.csv"
+### Aggregate both files
 
+rule ag_fastas:
+    input:
+        ag_fasta_one=expand("outputs/consensus/merged/{sample}_{down}.fasta",sample=metdata_dedup["merged_id"],down=downsamples),
+        ag_fasta_two=expand("outputs/consensus/imputted/{sample}_{down}.fasta",sample=metdata_dedup["merged_id"],down=downsamples)
+    output:
+        merged_out="outputs/consensus/all.fasta",
+        imputted_out="outputs/consensus/impute.fasta"
+    run:
+        with open(output.merged_out,"w") as out_f:
+            for f in input.ag_fasta_one:
+                with open(f) as in_f:
+                    for line in in_f:
+                        out_f.write(line)
+        with open(output.imputted_out,"w") as out_f:
+            for f in input.ag_fasta_two:
+                with open(f) as in_f:
+                    for line in in_f:
+                        out_f.write(line)
+
+
+rule run_pangolin_imputted:
+    shadow: "shallow"
+    conda: workflow.basedir + "/envs/pangolin.yaml"
+    input:
+        "outputs/consensus/impute.fasta"
+    output:
+        "outputs/pangolin/imputted.csv"
+    threads:
+        20
+    shell:
+        "{SCRIPTS_DIR}/pangolin.sh {input} {output} {threads} TRUE"
+### Aggregate fasta and run this comment
+rule run_pangolin_raw:
+    shadow: "shallow"
+    conda: workflow.basedir + "/envs/pangolin.yaml"
+    input:
+        "outputs/consensus/all.fasta"
+    output:
+        "outputs/pangolin/raw.csv"
+    threads:
+        1
+    shell:
+        "{SCRIPTS_DIR}/pangolin.sh {input} {output} {threads} TRUE"
+
+
+
+rule get_consensus_from_merged_impute:
+    shadow: "minimal"
+    group: "vcf_output"
+    input:
+        interval = "outputs/vcf/filter/{sample}_{down}.vcf.gz", 
+        quasi_in="outputs/impute/merged/all.vcf.gz",
+        bam="outputs/downsamples/{sample}_{down}.bam",
+        coverage="outputs/coverage/{sample}_{down}.cov"
+    output:
+        fasta="outputs/consensus/imputted/{sample}_{down}.fasta"
+    params:
+        sample=get_sample_depth
+    run:
+        shell("{SCRIPTS_DIR}/generate_consensus.py  --coverage-in {input.coverage} -v {input.interval} -d {MIN_DEPTH} -p 1.0 -o {output.fasta} -c /dev/null -r {SARS_REF}        -i {input.bam} -s {params.sample} --quasi-vcf {input.quasi_in} --imputted ")
+
+rule get_consensus_from_merged:
+    shadow: "minimal"
+    group: "vcf_output"
+    input:
+        interval = "outputs/vcf/filter/{sample}_{down}.vcf.gz", 
+        quasi_in="outputs/impute/merged/merged.vcf.gz",
+#        quasi_in= "outputs/quasi_species/merged/all.vcf",
+        bam="outputs/downsamples/{sample}_{down}.bam",
+        coverage="outputs/coverage/{sample}_{down}.cov"
+    output:
+        fasta="outputs/consensus/merged/{sample}_{down}.fasta",
+        coverage="outputs/consensus/merged/{sample}_{down}.cov",
+    params:
+        sample=get_sample_depth
+    run:
+        shell("{SCRIPTS_DIR}/generate_consensus.py  --coverage-in {input.coverage} -v {input.interval} -d {MIN_DEPTH} -p 1.0 -o {output.fasta} -c {output.coverage} -r {SARS_REF}        -i {input.bam} -s {params.sample} --quasi-vcf {input.quasi_in} --imputted")
+
+rule get_coverage:
+    input: 
+        bam="outputs/downsamples/{sample}_{down}.bam",
+    output:
+        coverage="outputs/coverage/{sample}_{down}.cov"
+    run:
+        shell("bedtools genomecov -ibam {input.bam} -d > {output.coverage}")
+
+rule quasi_vcf:
+    input:
+        expand("outputs/vcf/filter/{sample}_{down}.vcf.gz", sample=metdata_dedup["merged_id"],down=downsamples)
+    output:
+        "outputs/quasi_species/merged/all.vcf"
+    run:
+        shell("bcftools merge {input} | bgzip -c > test.vcf.gz")
+        shell("tabix -p vcf test.vcf.gz")
+        shell("{SCRIPTS_DIR}/vcf_filter/allelic_balance.py --vcf test.vcf.gz -o {output}")
+
+rule vcf_filter:
+    shadow: "minimal"
+    input:
+        bam="outputs/downsamples/{sample}_{down}.bam"
+    output:
+        vcf="outputs/vcf/filter/{sample}_{down}.vcf.gz",
+        tbi="outputs/vcf/filter/{sample}_{down}.vcf.gz.tbi"
+    run:
+        shell("bcftools mpileup -a FMT/DP -a FMT/AD -f {SARS_REF} {input.bam} | bcftools call -Ov -m | bgzip -c > test.vcf.gz && tabix -p vcf test.vcf.gz")
+        shell("bcftools view -e 'QUAL < {MIN_QUAL}|| MIN(FORMAT/DP) < {MIN_DEPTH} ' test.vcf.gz | bgzip -c > {output.vcf}")
+        shell("tabix -p vcf {output.vcf}")
+    
 
 rule create_downsample_bam:
+    shadow: "minimal"
     input:
         #bam subset
+        "input/mapping_stats/bam_subset/merged/{sample}.bam"
     output:
-
-
+        bam="outputs/downsamples/{sample}_{down}.bam",
+        bai="outputs/downsamples/{sample}_{down}.bam.bai"
     params:
-        coverage=get_mean_coverage
-    shell:
+        coverage=get_mean_coverage,
+        sample_depth=get_sample_depth
+    run:
+        fraction = float(wildcards.down)/float(params.coverage)
+        shell("samtools view -bh -s {fraction} {input} > test.bam") 
+        shell("samtools index test.bam")
+        shell("java  -XX:ParallelGCThreads=1 -jar {PICARD_PATH} AddOrReplaceReadGroups I=test.bam O={output.bam} RGID=1 RGSM={params.sample_depth} RGLB=4 RGPL=ILLUMINA RGPU=unit1")
+        shell("samtools index {output.bam}")
         ### Get down to fraction ###
+
+
 
 rule create_imputted_vcf:
     input:
+        # Reference panel 
+        master_vcf="input/all.vcf",
+        # imputted vcf input #  $
+        vcf_input="outputs/quasi_species/merged/all.vcf"
+    output:
+        impute_variants="outputs/impute/merged/all.vcf.gz",
+        merged_variants="outputs/impute/merged/merged.vcf.gz"
+    run:
+        shell("cat {input.vcf_input} | bgzip -c > input.vcf.gz && tabix -p vcf input.vcf.gz")
+        shell("cat {input.master_vcf} | bgzip -c > input1.vcf.gz && tabix -p vcf input1.vcf.gz")
+        shell("bcftools merge input1.vcf.gz input.vcf.gz | bcftools view -v snps,indels | bgzip -c > {output.merged_variants} && tabix -p vcf {output.merged_variants}")
+        shell("{SCRIPTS_DIR}/impute/impute_vcf.R {output.merged_variants} {output.impute_variants} {meta_in}") 
         # vcf input
         # qc input
         # 
-        impute_vcf = ....
-        sample = ....
-    output:
-        "outputs/consensus/imputed/sars/{sample}_{down}.fasta"
+       # i#impute_vcf = ....
+       # sample = ....
+    #output:
+    #    "outputs/consensus/imputed/sars/{sample}_{down}.fasta"
 
 
-rule create_consensus_all:
-    ## Consensus from downnsample 
-    ## Consensus from imputted downsample
-
-# Pangolin for the imputted fastas.
-rule pangolin:
+#rule pangolin:
     ### imputted pangolin
     #
     ### non imputted pangolin
     #
     
-rule combine_pango_qc_input:
+#rule combine_pango_qc_input:
 # Pangolin for the non imputted fastas.
 
 #rule all:

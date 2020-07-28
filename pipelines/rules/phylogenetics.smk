@@ -10,9 +10,9 @@ rule run_pangolin:
     output:
         "outputs/pangolin/lineages.csv"
     threads:
-        20
+        1
     shell:
-        "{SCRIPTS_DIR}/pangolin.sh {input} {output} {threads}"
+        "{SCRIPTS_DIR}/pangolin.sh {input} {output} {threads} TRUE"
 
 def get_pango_in_double_ups(wildcards):
     return(f"outputs/consensus/merged/phased/sars2/all_{MIN_DEPTH}_none.fasta")
@@ -25,16 +25,16 @@ rule run_pangolin_phased:
     output:
         "outputs/pangolin/doubleups.csv"
     threads:
-        20
+        1
     shell:
-        "{SCRIPTS_DIR}/pangolin.sh {input} {output} {threads}"
+        "{SCRIPTS_DIR}/pangolin.sh {input} {output} {threads} TRUE "
 
 rule assign_lineages_phased:
     conda: workflow.basedir +"/envs/nextstrain.yaml"
     input:
         input_fasta=get_pango_in_double_ups
     threads:
-        20
+        2
     output:
         nextstrain_clades="outputs/clades/nextstrain/doubleups.csv",
         gisaid_clades="outputs/clades/gisaid/doubleups.csv"
@@ -69,8 +69,10 @@ rule assign_lineages:
     output:
         nextstrain_clades="outputs/clades/nextstrain/lineages.csv",
         gisaid_clades="outputs/clades/gisaid/lineages.csv"
+    threads:
+        2
     shell:
-        "{SCRIPTS_DIR}/ncov/assign_lineages.sh {input.input_fasta} {output.nextstrain_clades} {output.gisaid_clades} {GISAID_CLADES} {NEXTSTRAIN_CLADES} {SARS2_REF_GENBANK}"
+        "{SCRIPTS_DIR}/ncov/assign_lineages.sh {input.input_fasta} {output.nextstrain_clades} {output.gisaid_clades} {GISAID_CLADES} {NEXTSTRAIN_CLADES} {SARS2_REF_GENBANK} {threads}"
 
 ##
 
@@ -86,10 +88,10 @@ rule phased_final:
     run:
         shell("java -jar {SOFTWARE_PATH}/beagle/beagle.18May20.d20.jar gt={input} out=test")
         shell("cp test.vcf.gz {output.beagle5}")
-        shell("tabix p -vcf {output.beagle5}")
+        shell("tabix -p vcf {output.beagle5}")
         shell("java -jar {SOFTWARE_PATH}/beagle/beagle.27Jan18.7e1.jar gt={input} out=test")
         shell("cp test.vcf.gz {output.beagle4}")
-        shell("tabix p -vcf {output.beagle4}")
+        shell("tabix -p vcf {output.beagle4}")
 
 rule create_phased_output:
     shadow: "minimal"
@@ -219,14 +221,14 @@ rule merge_pango_outputs:
         for sample in pango_in["taxon"]:
             pango_tmp = pango_double_ups[pango_double_ups["original_id"].isin([sample])]
             lineages = ",".join(pango_tmp["lineage"])
-            bootstrap = ",".join([str(o) for o in pango_tmp["UFbootstrap"]])
+            probabilities = ",".join([str(o) for o in pango_tmp["probability"]])
             nextstrain_tmp = nextstrain_doubleups[nextstrain_doubleups["original_id"].isin([sample])]
             lineage_nextstrain = ",".join(nextstrain_tmp["clade"])
             gisaid_tmp= gisaid_doubleups[gisaid_doubleups["original_id"].isin([sample])]
             lineage_gisaid= ",".join(gisaid_tmp["clade"])
-            pango_tuple.append([sample, lineages, bootstrap, lineage_nextstrain, lineage_gisaid]) 
+            pango_tuple.append([sample, lineages, probabilities, lineage_nextstrain, lineage_gisaid]) 
    
-        pango_out_df = pd.DataFrame(pango_tuple, columns=["sample","pangolin_phased","bootstrap_phased","nextstrain_phased","gisaid_phased"])
+        pango_out_df = pd.DataFrame(pango_tuple, columns=["sample","pangolin_phased","prob_phased","nextstrain_phased","gisaid_phased"])
         pango_in = pango_in.merge(pango_out_df,left_on="taxon",right_on="sample")
  #       pango_in.to_csv(output.pangolin_out_merged,sep=",",header=True)
         # Merge the phased genome lineages into the main dataset.
