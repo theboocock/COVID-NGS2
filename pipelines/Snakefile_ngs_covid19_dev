@@ -107,15 +107,25 @@ rule all:
 
 #print(samples
 
+include: "rules/qc_metrics.smk"
+include: "rules/variant_calling.smk"
+include: "rules/phylogenetics.smk"
+rule final_rule:
+    input:
+        rules.merge_in_pango.output.merged_csv
+    output:
+        "outputs/finished.txt"
+    shell:
+        "touch {output}"
+
+
+
 mapped_sample_names = {}
 for key, value in mapped_uid.items():
     for val in value:
         mapped_sample_names[str(val)] = key 
 
 include: "rules/align.smk"
-include: "rules/qc_metrics.smk"
-include: "rules/variant_calling.smk"
-include: "rules/phylogenetics.smk"
 #
 #
 
@@ -135,20 +145,13 @@ rule qc_input:
 rule generate_final_dataset_package:
     input:
         qc_report_in="outputs/qc_report/all.qc",
-        pangolin_out="outputs/pangolin/lineages_merged.csv",
         input_consensus = expand("outputs/consensus/merged/{intervals}/all_{depth}.fasta", depth=MIN_DEPTH, intervals=intervals),
         input_consensus_phylo = expand("outputs/consensus/merged/phylo/{intervals}/all_{depth}.fasta", depth=MIN_DEPTH, intervals=intervals),
-        read_one = expand("outputs/filtered_fastqs/{intervals}/{sample}.R1.fastq.gz",intervals=intervals,sample=samples),
-        read_two = expand("outputs/filtered_fastqs/{intervals}/{sample}.R2.fastq.gz",intervals=intervals, sample=samples),
-        depleted_read_one = expand("outputs/depleted_fastqs/human/{sample}.R1.fastq.gz",sample=samples),
-        depleted_read_two = expand("outputs/depleted_fastqs/human/{sample}.R2.fastq.gz", sample=samples),
         merged_vcf = "outputs/bcftools_vcfs/merged/filt/sars2/all.vcf.gz"
     output:
-        merged_csv=report("outputs/final/merged/qc_report.tsv",category="qc_reports/final",caption=workflow.basedir + "/report/coverage_plots.rst"),
-        merged_csv_unfiltered=report("outputs/qc_report/merged/qc_report.tsv",category="qc_reports/merged",caption=workflow.basedir + "/report/coverage_plots.rst"),
+        merged_csv="outputs/final/merged/qc_report.tsv.inco",
+        merged_csv_unfiltered="outputs/qc_report/merged/qc_report.tsv.inco",
         #report(directory("outputs/final/merged/coverage_plots/{intervals}/"),patterns=["{sample}.png"],category="coverage_plots/final_coverage_plots",caption=workflow.basedir+ "/report/coverage_plots.rst")
-        filtered_fastqs=directory("outputs/final/merged/filtered_fastqs") ,
-        depeleted_fastqs=directory("outputs/final/merged/host_depleted_fastqs"),
         consensus_fasta="outputs/final/merged/all.fasta",
         final_vcf="outputs/final/merged/all.vcf.gz",
         phylo_fasta="outputs/final/merged/phylo/all.fasta"
@@ -190,10 +193,8 @@ rule generate_final_dataset_package:
         out_df["sars2_percent_dup"] = out_df["mapped_sars2_dup"]/out_df["total_read_count"]
         out_df["sars2_percent_dedup"] = out_df["mapped_sars2_dedup"]/out_df["total_read_count"]
         #out_df["sars2_percent"] = out_df["mapped_sars2"]/(out_df["mapped_human"] + out_df["mapped_rrna"] + out_df["mapped_sars2"]) * 100
-        pango_in = pd.read_csv(input.pangolin_out, sep="\t")
         out_df = out_df.merge(coverage_5x_df, left_on="merged_id", right_on="merged_id", how="outer")
         out_df = out_df.merge(library_df, left_on="merged_id", right_on="merged_id", how="outer")
-        out_df = out_df.merge(pango_in, left_on="read_group_name", right_on="taxon", how="outer")
         #### 
         ####
         #nextstrain_clade="outputs/clades/nextstrain/lineages.csv",
@@ -233,15 +234,6 @@ rule generate_final_dataset_package:
                     out_f.write(sample.replace("_","-")+ "\n")
             shell("bcftools view -S tmp_sample_list.txt {input.merged_vcf} | bgzip -c > {output.final_vcf} && tabix -p vcf {output.final_vcf}")
             os.remove("tmp_sample_list.txt")
-            for key in in_fasta.keys():
-                rows = metadata["sample"][metadata["id_library_type"].isin(out_df["uid_lib"][out_df["read_group_name"]  == key])]
-                merged_id = str(out_df["merged_id"][out_df["read_group_name"]==key]).split()[1]
-                for row in rows:
-                    shell("cat outputs/filtered_fastqs/sars2/{sample}.R1.fastq.gz >> outputs/final/merged/filtered_fastqs/{key}.R1.fastq.gz".format(sample=row,key=merged_id))
-                    shell("cat outputs/filtered_fastqs/sars2/{sample}.R1.fastq.gz >> outputs/final/merged/filtered_fastqs/{key}.R2.fastq.gz".format(sample=row,key=merged_id))
-                    shell("cat outputs/depleted_fastqs/human/{sample}.R1.fastq.gz >> outputs/final/merged/host_depleted_fastqs/{key}.R1.fastq.gz".format(sample=row,key=merged_id))
-                    shell("cat outputs/depleted_fastqs/human/{sample}.R1.fastq.gz >> outputs/final/merged/host_depleted_fastqs/{key}.R2.fastq.gz".format(sample=row,key=merged_id))
-            
             out_df = out_df[out_df["merged_id"].isin(kept_ids)] 
             out_df.to_csv(output.merged_csv, sep="\t",index=False)
 

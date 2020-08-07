@@ -210,44 +210,6 @@ rule kraken_filter_reads:
 
 
 ## Merge libraries that are the sample library type + sample id then rerun the pipeline for these samples. 
-def get_bams(wildcards):
-    samples = mapped_uid[wildcards.sample]
-    return(expand("outputs/md/{intervals}/{sample}.sorted.md.bam", intervals=intervals, sample= samples))
-
-def get_bai(wildcards):
-    samples = mapped_uid[wildcards.sample]
-    return(expand("outputs/md/{intervals}/{sample}.sorted.md.bam.bai", intervals=intervals, sample= samples))
- 
-def get_sample_name_for_merge(wildcards):
-	sample_id = sample_names_hash[wildcards.sample][0]
-	# TODO REMOVE
-	return(sample_id)
-#TODO: merged bams
-#rule merged_bams:
-#    shadow: "minimal"
-#    group: "align"
-#    input:
-#        bams = get_bams, 
-#        bai = get_bai
- #   output:
-##        bam="outputs/md/merged/{intervals}/{sample}.bam",
-#        bai="outputs/md/merged/{intervals}/{sample}.bam.bai"
-#    params:
-#        rg=get_sample_name_for_merge    
-#    run:
-#        if len(input.bams) != 1:
-#            # Skip merge
-#            shell("samtools merge tmp.bam {input.bams} && samtools sort tmp.bam > sorted.bam")
-#            shell("java -jar {PICARD_PATH} AddOrReplaceReadGroups I=sorted.bam O={output.bam} RGID=1 RGSM={params.rg} RGLB=4 RGPL=ILLUMINA RGPU=unit1")
-#        else:
-#            shell("java -jar {PICARD_PATH} AddOrReplaceReadGroups I={input.bams} O={output.bam} RGID=1 RGSM={params.rg} RGLB=4 RGPL=ILLUMINA RGPU=unit1")
-#        shell("samtools index {output}")
-#
-
-def get_rg(wildcards):
-    strain_name =get_sample_name(wildcards)
-    rg="@RG\\tID:{sample}\\tSM:{sample}\\tPL:illumina\\tLB:lib1\\tPU:unit1".format(sample=strain_name)
-    return(rg)
 
 rule bwa_map2: 
     input: 

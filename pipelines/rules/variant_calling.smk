@@ -15,6 +15,7 @@ rule haplotype_caller:
     shell:
         "{SCRIPTS_DIR}/haplotype_caller.sh {GATK_PATH} {SARS_REF} {input.bam} {output} {threads}"
 
+
 def _gatk_multi_arg(flag, files):
     cmd_string = flag + flag.join(files)
     return cmd_string

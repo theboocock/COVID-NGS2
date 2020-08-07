@@ -1,0 +1,50 @@
+configfile:  workflow.current_basedir + "/defaults.yaml" 
+CONFIGFILE= workflow.current_basedir + "/defaults.yaml" 
+
+include: "rules/config.smk"
+include: "rules/utils.smk"
+
+depth_range = [int(MIN_DEPTH)]
+min_cov = 0.8
+
+taxon_dict = read_taxid(TAXON_IN)
+metadata=fastq_match(config)
+#type_uid 
+#metadata = metadata[metadata["sample"].isin([72,83,107,131,367])]
+samples=metadata["sample"]
+# uid type merges libraries across samples
+try:
+    if config["merge_rule"] == "uid_type": 
+        mapped_uid, sample_names_hash, mapped_uids_read_one, mapped_uids_read_two = uid_library_to_sample_name_and_readgroup()
+    # merges all libraries by uid
+    elif config["merge_rule"] == "uid":
+        #  print("HERE")
+        mapped_uid, sample_names_hash, mapped_uids_read_one, mapped_uids_read_two = uid_library_to_sample_name() 
+    elif config["merge_rule"] == "uid_oligo":
+        mapped_uid, sample_names_hash, mapped_uids_read_one, mapped_uids_read_two = uid_library_to_sample_hash(merge_rule="uid_oligo") 
+    elif config["merge_rule"] == "column_uid_sample_type":
+        mapped_uid, sample_names_hash, mapped_uids_read_one, mapped_uids_read_two = uid_library_to_sample_hash(merge_rule="column_uid_sample_type") 
+
+except KeyError:
+    mapped_uid, sample_names_hash, mapped_uids_read_one, mapped_uids_read_two = uid_library_to_sample_name_and_readgroup()
+    pass
+
+ #   print(mapped_uid)
+
+### metadata["sample"]
+#### metadata["strain"]
+
+#mapped_uid, sample_names_hash, mapped_uids_read_one, mapped_uids_read_two = uid_library_to_sample_name_and_readgroup()
+#with open("sample_mapping.txt","w") as out_f:
+#    for key, items in mapped_uid.items():
+#        print(key)
+#        print(items)
+#        out_f.write(str(key) + " " + " ".join([str(o) for o in items]) + "\n")
+#samples=["2011"]
+rule all:
+    input:
+        "outputs/quasi_species/merged/all_from_merged.vcf"
+
+include: "rules/qc_metrics.smk"
+include: "rules/variant_calling.smk"
+include: "rules/phylogenetics.smk"

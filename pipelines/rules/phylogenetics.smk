@@ -2,6 +2,23 @@ def get_pango_in_all(wildcards):
 
     return(f"outputs/consensus/merged/phylo/sars2/all_{MIN_DEPTH}_none.fasta")
 
+rule merge_in_pango:
+    input:
+        merged_csv="outputs/final/merged/qc_report.tsv.inco",
+        merged_csv_unfiltered="outputs/qc_report/merged/qc_report.tsv.inco",
+        pangolin_out="outputs/pangolin/lineages_merged.csv",
+    output:
+        merged_csv="outputs/final/merged/qc_report.tsv",
+        merged_csv_unfiltered="outputs/qc_report/merged/qc_report.tsv"
+    run:
+        pango_in = pd.read_csv(input.pangolin_out, sep="\t")
+        out_df = pd.read_csv(input.merged_csv,sep="\t")
+        out_df = out_df.merge(pango_in, left_on="read_group_name", right_on="taxon", how="outer")
+        out_df2= pd.read_csv(input.merged_csv_unfiltered,sep="\t")
+        out_df2 = out_df2.merge(pango_in, left_on="read_group_name", right_on="taxon", how="outer")
+        out_df.to_csv(output.merged_csv, sep="\t",index=False)
+        out_df2.to_csv(output.merged_csv_unfiltered, sep="\t",index=False)
+
 rule run_pangolin:
     shadow: "shallow"
     conda: workflow.basedir + "/envs/pangolin.yaml"
@@ -41,6 +58,29 @@ rule assign_lineages_phased:
     shell:
         "{SCRIPTS_DIR}/ncov/assign_lineages.sh {input.input_fasta} {output.nextstrain_clades} {output.gisaid_clades} {GISAID_CLADES} {NEXTSTRAIN_CLADES} {SARS2_REF_GENBANK} {threads}"
 
+rule create_imputted_vcf:
+    input:
+        vcf_input="outputs/final/merged/quasi_species/all.vcf",
+        qc_input="outputs/qc_output/merged/qc_report.tsv"
+    output:
+        impute_variants="outputs/impute/merged/all.vcf.gz"
+    run:
+        shell("{SCRIPTS_DIR}/impute/impute_vcf.R {input.vcf_input} {output.impute_variants} {meta_in}") 
+
+rule get_consensus_from_merged_impute:
+    shadow: "minimal"
+    group: "vcf_output"
+    input:
+        interval = "outputs/vcf/filter/{sample}_{down}.vcf.gz", 
+        quasi_in="outputs/impute/merged/all.vcf.gz",
+        bam="outputs/downsamples/{sample}_{down}.bam",
+        coverage="outputs/coverage/{sample}_{down}.cov"
+    output:
+        fasta="outputs/consensus/imputted/{sample}_{down}.fasta"
+    params:
+        sample=get_sample_depth
+    run:
+        shell("{SCRIPTS_DIR}/generate_consensus.py  --coverage-in {input.coverage} -v {input.interval} -d {MIN_DEPTH} -p 1.0 -o {output.fasta} -c /dev/null -r {SARS_REF}        -i {input.bam} -s {params.sample} --quasi-vcf {input.quasi_in} --imputted ")
 #rule run_pangolin:
 #    shadow: "shallow"
 #    conda: workflow.basedir + "/envs/pangolin.yaml"

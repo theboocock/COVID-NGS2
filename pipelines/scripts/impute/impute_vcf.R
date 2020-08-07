@@ -64,14 +64,14 @@ vcf_master = read.vcfR(vcf_master)
 impute_each_sample = function(sample_focal, gt_matrix,lambda=3,rank.max=3,type="svd",threshold=0.7){
     ### Remove all sample focals.
     sample_names = colnames(gt_matrix)
+	keep_idx_in = grep("-",sample_names)
     idx_focal = which(sample_names == sample_focal) 
     reworked_sample_names = str_replace_all(sample_names, "-","_")
     sample_focal_pre= str_split(sample_focal,"_")[[1]][2]
-
     ### Remove all reference to the focal sample ### 
     reworked_sample_names_split = unlist(lapply(str_split(reworked_sample_names, "_"),function(x){x[2]}))
     keep_idx = which(!(reworked_sample_names_split == sample_focal_pre))
-    ### 
+    keep_idx = keep_idx[keep_idx%in% keep_idx_in]
     idx_keep_and_sample_focal = c(keep_idx,idx_focal)
     impute = gt_matrix[,idx_keep_and_sample_focal]
     xxx = softImpute(impute, rank.max=rank.max,lambda=lambda,trace=F,type=type)

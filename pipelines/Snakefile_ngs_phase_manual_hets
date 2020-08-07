@@ -1,0 +1,92 @@
+configfile:  workflow.current_basedir + "/defaults.yaml" 
+CONFIGFILE= workflow.current_basedir + "/defaults.yaml" 
+
+include: "rules/config.smk"
+include: "rules/utils.smk"
+
+
+sample = {"LA_0061":"LA-0061",
+        "LA_0171":"LA-0171",
+        "LA_0172":"LA-0172",
+        "LA_0181":"LA-0181",
+        "LA_0193":"LA-0193",
+        "LA_0194":"LA-0194",
+        "LA_0196":"LA-0196",
+        "LA_0197":"LA-0197",
+        "LA_0198":"LA-0198",
+        "LA_0199":"LA-0199",
+        "LA_0239":"LA-0239"}
+
+rule all:
+    input:
+        "phased/pangolin/lineages.csv"
+
+rule ag_fasta:
+    input:
+        fastas=expand("phased/consensus/{sample}.fasta", sample=sample.keys())
+    output:
+        "phased/consensus/all.fasta"
+    run:
+        with open(output[0],"w") as out_f:
+            for input in input.fastas:
+                sample = os.path.basename(input).split(".fasta")[0]
+                with open(input) as in_f:
+                    for i, line in enumerate(in_f):
+                        if i == 0:
+                            out_f.write(">"+str(sample)+"_1\n")
+                        else:
+                            out_f.write(line)
+                with open(input.split(".fasta")[0]+"_2.fasta") as in_f:
+                    for i, line in enumerate(in_f):
+                        if i == 0:
+                            out_f.write(">"+str(sample)+"_2\n")
+                        else:
+                            out_f.write(line)
+rule phased_final:
+    input:
+        "final.vcf.gz"
+    output:
+        beagle5="phased/quasi_species/merged/phased.vcf.gz",
+        beagle5_tbi="phased/quasi_species/merged/phased.vcf.gz.tbi",
+        beagle4="phased/quasi_species/merged/phased_beagle4.vcf.gz"
+    run:
+        shell("java -jar {SOFTWARE_PATH}/beagle/beagle.18May20.d20.jar gt={input} out=test")
+        shell("cp test.vcf.gz {output.beagle5}")
+        shell("tabix -p vcf {output.beagle5}")
+        shell("java -jar {SOFTWARE_PATH}/beagle/beagle.27Jan18.7e1.jar gt={input} out=test")
+        shell("cp test.vcf.gz {output.beagle4}")
+        shell("tabix -p vcf {output.beagle4}")
+
+def get_sample_from_hash(wildcards):
+    return(sample[wildcards.sample])
+
+rule create_phased_output:
+    shadow: "minimal"
+    input:
+        interval = "outputs/bcftools_vcfs/merged/filt/sars2/{sample}.snps_and_indels.vcf.gz",
+        quasi_in="phased/quasi_species/merged/phased.vcf.gz",
+        quasi_tbx="phased/quasi_species/merged/phased.vcf.gz.tbi",
+        bam="outputs/mapping_stats/bam_subset/merged/{sample}.bam",
+        coverage="outputs/coverage/merged/sars2/{sample}.cov"
+    output:
+        fasta="phased/consensus/{sample}.fasta",
+        fasta_two="phased/consensus/{sample}_2.fasta"
+    params:
+        sample=get_sample_from_hash
+    run:
+        shell("touch {output.fasta}")
+        shell("touch {output.fasta_two}")
+        shell("{SCRIPTS_DIR}/generate_consensus.py  --coverage-in {input.coverage} -v {input.interval} -d 3 -p 1.0 -o {output.fasta} -c /dev/null -r {SARS_REF}        -i {input.bam} -s {params.sample} -m {SITES_TO_MASK} --quasi-vcf {input.quasi_in} --phased")
+
+
+rule run_pangolin:
+    shadow: "shallow"
+    conda: workflow.basedir + "/envs/pangolin.yaml"
+    input:
+        "phased/consensus/all.fasta"
+    output:
+        "phased/pangolin/lineages.csv"
+    threads:
+        1
+    shell:
+        "{SCRIPTS_DIR}/pangolin.sh {input} {output} {threads} TRUE"

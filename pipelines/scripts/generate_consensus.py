@@ -99,6 +99,7 @@ def get_sample_vcf(vcf_gz, sample,quasi_vcf):
 
 import shutil
 invert_bed = "bedtools subtract -a tmp.bed -b vcf_mask.bed > vcf_mask_invert.bed"
+#invert_bed = "cp vcf_mask.bed vcf_mask_invert.bed"
 ### ignore het sites ##  
 def get_consensus_fasta(reference_genome, sample, output_consensus, output_cov, snps_to_exclude_bed,phased,quasi_vcf,imputted):
 

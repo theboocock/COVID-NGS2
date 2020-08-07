@@ -1,0 +1,64 @@
+
+configfile:  workflow.current_basedir + "/defaults.yaml" 
+CONFIGFILE= workflow.current_basedir + "/defaults.yaml" 
+
+print(CONFIGFILE)
+include: "rules/config.smk"
+
+
+import pyfasta
+import pandas as pd
+gisaid_in = GISAID_FASTA 
+
+gisaid_fasta = pyfasta.Fasta(gisaid_in)
+width=20
+split_ranges = list(range(0,len(gisaid_fasta.keys()),width))
+split_idx = list(range(len(split_ranges)))
+gisaid_metadata = pd.read_csv(GISAID_METADATA,sep="\t")
+
+
+rule all:
+    input:
+        "outputs/pangolin/lineages_merged.csv"
+
+rule pange_merge:
+    input:
+        in_csv = expand("outputs/pangolin/split/{split}.csv",split=split_idx)
+    output:
+        merged_lineages = "outputs/pangolin/lineages_merged.csv"
+    run:
+        out_df = pd.read_csv(input.in_csv[0],sep=",")
+        for i in range(1,len(input.in_csv)):
+            tmp_df = pd.read_csv(input.in_csv[i], sep=",")
+            out_df =out_df.append(tmp_df)
+        out_df.to_csv(output.merged_lineages, sep=",",index=False)
+
+
+rule fasta_split:
+    input:
+        gisaid_in
+    output:
+       out_file="outputs/fastas/{split}.fasta"
+    run:
+        idxs = split_ranges[int(wildcards.split)]
+        with open(output.out_file,"w") as out_f:
+            for i in range(idxs,idxs+width):
+                try:
+                    out_genome = list(gisaid_fasta.keys())[i]
+                except:
+                    break
+                if gisaid_metadata["host"][gisaid_metadata["strain"].isin([out_genome])].isin(["human"]).all():
+                    out_f.write(">" + list(gisaid_fasta.keys())[i] +"\n")
+                    out_f.write(str(gisaid_fasta[list(gisaid_fasta.keys())[i]]) + "\n")
+
+rule pangolin_split:
+    shadow: "shallow"
+    conda: workflow.basedir + "/envs/pangolin.yaml"
+    input:
+       "outputs/fastas/{split}.fasta"
+    output:
+       "outputs/pangolin/split/{split}.csv"
+    threads:
+        1
+    shell:
+        "{SCRIPTS_DIR}/pangolin.sh {input} {output} {threads} TRUE"

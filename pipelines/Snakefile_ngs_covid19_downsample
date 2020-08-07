@@ -8,7 +8,6 @@ CONFIGFILE= workflow.current_basedir + "/defaults.yaml"
 
 include: "rules/config.smk"
 include: "rules/utils.smk"
-
 depth_range = [int(MIN_DEPTH)]
 min_cov = 0.8
 
@@ -34,7 +33,7 @@ meta_in = config["sample_list"]
 #
 metdata_dedup = metadata[metadata["coverage_mean_dedup"] > 200].head(n=60)
 
-downsampled = [0.1,0.5,1.0,2.0,3.0,4.0,5.0,10.0,20.0,30.0,250.0]
+downsamples = [0.1,0.5,1.0,2.0,3.0,4.0,5.0,10.0,20.0,30.0,250.0]
 
 def get_mean_coverage(wildcards):
     print(wildcards.sample)
@@ -86,7 +85,7 @@ rule run_pangolin_imputted:
     output:
         "outputs/pangolin/imputted.csv"
     threads:
-        20
+        1
     shell:
         "{SCRIPTS_DIR}/pangolin.sh {input} {output} {threads} TRUE"
 ### Aggregate fasta and run this comment

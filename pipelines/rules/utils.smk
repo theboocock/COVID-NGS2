@@ -7,6 +7,54 @@
 #    r1 = metadata["read_one"][metadata["uid_library_type"] == library_uid]
 #    return(r1)
 
+
+def get_mean_coverage(wildcards):
+    print(wildcards.sample)
+    cov = metdata_dedup[metdata_dedup["merged_id"] == wildcards.sample]
+    return cov["coverage_mean_dedup"] 
+
+def get_pango_in_all(wildcards):
+    return(f"outputs/consensus/merged/phased/sars2/all_{MIN_DEPTH}_none.fasta")
+def get_sample_depth(wildcards):
+    return wildcards.sample +  "_"  +  str(wildcards.down)
+
+def get_bams(wildcards):
+    samples = mapped_uid[wildcards.sample]
+    return(expand("outputs/md/{intervals}/{sample}.sorted.md.bam", intervals=intervals, sample= samples))
+
+def get_bai(wildcards):
+    samples = mapped_uid[wildcards.sample]
+    return(expand("outputs/md/{intervals}/{sample}.sorted.md.bam.bai", intervals=intervals, sample= samples))
+ 
+def get_sample_name_for_merge(wildcards):
+    sample_id = sample_names_hash[wildcards.sample][0]
+    return(sample_id)
+#TODO: merged bams
+#rule merged_bams:
+#    shadow: "minimal"
+#    group: "align"
+#    input:
+#        bams = get_bams, 
+#        bai = get_bai
+ #   output:
+##        bam="outputs/md/merged/{intervals}/{sample}.bam",
+#        bai="outputs/md/merged/{intervals}/{sample}.bam.bai"
+#    params:
+#        rg=get_sample_name_for_merge    
+#    run:
+#        if len(input.bams) != 1:
+#            # Skip merge
+#            shell("samtools merge tmp.bam {input.bams} && samtools sort tmp.bam > sorted.bam")
+#            shell("java -jar {PICARD_PATH} AddOrReplaceReadGroups I=sorted.bam O={output.bam} RGID=1 RGSM={params.rg} RGLB=4 RGPL=ILLUMINA RGPU=unit1")
+#        else:
+#            shell("java -jar {PICARD_PATH} AddOrReplaceReadGroups I={input.bams} O={output.bam} RGID=1 RGSM={params.rg} RGLB=4 RGPL=ILLUMINA RGPU=unit1")
+#        shell("samtools index {output}")
+#
+
+def get_rg(wildcards):
+    strain_name =get_sample_name(wildcards)
+    rg="@RG\\tID:{sample}\\tSM:{sample}\\tPL:illumina\\tLB:lib1\\tPU:unit1".format(sample=strain_name)
+    return(rg)
 def uid_library_to_sample_name(): 
     id_library_type  = metadata["uid"] 
     metadata["id_library_type"] = id_library_type
@@ -133,3 +181,4 @@ def fastq_match(config):
         sys.exit(1)
     meta_in=pd.read_csv(config["sample_list"],sep="\t")
     return meta_in 
+
