@@ -1,0 +1,12 @@
+
+
+
+
+
+rule al:
+    input:
+        "tree_building/all.tree"
+
+
+rule tree_building:
+    
