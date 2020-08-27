@@ -10,6 +10,8 @@ import pyfasta
 import pandas as pd
 gisaid_in = GISAID_FASTA 
 
+
+#### Get the new genomes ### 
 gisaid_fasta = pyfasta.Fasta(gisaid_in)
 width=20
 split_ranges = list(range(0,len(gisaid_fasta.keys()),width))

@@ -221,7 +221,7 @@ rule combine_vcfs:
 
 rule combine_filtered_vcf:
     input:
-        vcfs = expand("outputs/bcftools_vcfs/merged/filt/{intervals}/{sample}.snps_and_indels.vcf.gz",intervals=intervals, sample=mapped_uid.keys())
+        vcfs = expand("outputs/bcftools_vcfs/merged/filt/{intervals}/{sample}.snps_and_indels.vcf.gz" intervals=intervals, sample=mapped_uid.keys())
     output:
         "outputs/bcftools_vcfs/merged/filt/sars2/all.vcf.gz"
     shell:

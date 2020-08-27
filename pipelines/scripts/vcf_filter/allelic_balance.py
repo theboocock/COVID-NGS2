@@ -113,9 +113,10 @@ def vcf_input_filter(vcf_file,lower, upper, vcf_outfile):
                             gt = str(sample["GT"][1]) + "/" + str(sample["GT"][1])
                         else:
                             other = str(idx+1)
-                            gt = "0" + "/" + other 
-                            if int(dp) < 10:
-                                gt = './.'
+                            gt = "0" + "/" + other
+                            if alt_allele >= 2 and ref_allele >=2:
+                                gt = "0" + "/" + other
+                            else:
                                 gt = './.'
 
                     keys = sample.keys()[1:]
@@ -147,8 +148,8 @@ def vcf_input_filter(vcf_file,lower, upper, vcf_outfile):
 def main():
     parser = argparse.ArgumentParser(description="Allelic balance filter")
     parser.add_argument("--vcf",dest="vcf_input", help="VCF input")
-    parser.add_argument("-l","--lower", dest="lower_threshold", default=.2)
-    parser.add_argument("-u","--upper", dest="upper_threshold", default=.8)
+    parser.add_argument("-l","--lower", dest="lower_threshold", default=.1)
+    parser.add_argument("-u","--upper", dest="upper_threshold", default=.9)
     parser.add_argument("-o","--vcf-out", dest="vcf_output") 
     args = parser.parse_args()
     lower = float(args.lower_threshold)

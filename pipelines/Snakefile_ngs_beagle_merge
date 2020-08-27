@@ -1,0 +1,191 @@
+configfile:  workflow.current_basedir + "/defaults.yaml" 
+CONFIGFILE= workflow.current_basedir + "/defaults.yaml" 
+
+include: "rules/config.smk"
+include: "rules/utils.smk"
+depth_range = [int(MIN_DEPTH)]
+min_cov = 0.8
+
+taxon_dict = read_taxid(TAXON_IN)
+print(config["sample_list"])
+metadata = pd.read_csv(config["sample_list"],sep="\t")
+meta_in = config["sample_list"]
+unique_samples = config["unique_samples"]
+
+meta_in = pd.read_csv(meta_in,sep="\t")
+meta_in = meta_in[meta_in["coverage_mean_dedup"] > 100] 
+### Get random pairs of different lineages ####
+### Phase them using the big dataset and see if I recover the same lineages ###
+### So I need to de variant calling etc ###
+####
+###
+import pandas as pd
+# Just NEB
+unique_in =  pd.read_csv(unique_samples,sep="\t") 
+meta_in = meta_in.merge(unique_in,left_on="sample_name_fasta",right_on="x")
+
+random_lineages = meta_in.sample(n=100,random_state=30)
+import numpy
+sample_in = {}
+pango_in= {}
+i = 1
+for idx, row in random_lineages.iterrows():
+    lineage = row["lineage"]
+    mask = numpy.logical_not(meta_in["lineage"].isin([lineage]))
+    meta_tmp = meta_in[mask]
+    meta_tmp = meta_tmp.sample(n=1,random_state=30)
+    uid_in = str(meta_tmp["merged_id"]).split()[1]
+    uid_in_one = row["merged_id"]
+    sample_in[i] =[uid_in_one, uid_in]
+    # Get probability 
+    prob_one = str(row["probability"])
+    prob_two = str(meta_tmp["probability"]).split()[1]
+
+    lin_one = str(row["lineage"])
+    lin_two= str(meta_tmp["lineage"]).split()[1]
+    
+    pango_in[i] = [(lin_one,prob_one),(lin_two,prob_two)] 
+    i = i + 1
+
+#multi_lineage = ["LA_0061","LA_00171","LA_00172","LA_0193","LA_0194","LA_0196","LA0197","LA_0198","LA_0199",
+#
+
+### ### 
+print(pango_in)
+def get_bam_in(wildcards):
+    in_bam = expand("/u/home/s/smilefre/project-kruglyak/covid_runs/rerun_all_new_july20/uid_type/outputs/mapping_stats/bam_subset/merged/{sample}.bam",sample=sample_in[int(wildcards.sample)])
+    return(in_bam)
+
+rule all:
+    input:
+        "outputs/quasi_species/merged/all.vcf",
+        expand("outputs/consensus/phased/{sample}.fasta",sample=sample_in.keys()),
+        "outputs/consensus_all.fasta",
+        "outputs/pangolin/doubleups.csv"
+
+rule quasi_vcf:
+    input:
+        expand("outputs/vcf/filter/{sample}.vcf.gz",sample=sample_in.keys()) 
+    output:
+        "outputs/quasi_species/merged/all.vcf",
+    run:
+        shell("bcftools merge {input} | bcftools view -v snps,indels | bgzip -c > test.vcf.gz")
+        shell("tabix -p vcf test.vcf.gz")
+        shell("{SCRIPTS_DIR}/vcf_filter/allelic_balance.py --vcf test.vcf.gz -o {output}")
+
+
+rule run_pangolin_phased:
+    shadow: "shallow"
+    conda: workflow.basedir + "/envs/pangolin.yaml"
+    input:
+        "outputs/consensus_all.fasta"
+    output:
+        "outputs/pangolin/doubleups.csv"
+    threads:
+        1
+    shell:
+        "{SCRIPTS_DIR}/pangolin.sh {input} {output} {threads} TRUE "
+
+rule ag_fasta:
+    input:
+        fasta=expand("outputs/consensus/phased/{sample}.fasta",sample=sample_in.keys())
+    output:
+        out_all="outputs/consensus_all.fasta"
+    run:
+        with open(output.out_all,"w") as out_f:
+            for file_in in input.fasta:    
+                sample_name = os.path.basename(file_in).split(".fasta")[0]
+                print(sample_name)
+                with open(file_in) as in_f:
+                    for i, line in enumerate(in_f):
+                        if i == 0:
+                            out_f.write(">" + sample_name + "_1" + "\n")
+                        else:
+                            out_f.write(line)
+                with open(file_in.split(".fasta")[0] + "_2.fasta") as in_f:
+                    for i, line in enumerate(in_f):
+                        if i == 0:
+                            out_f.write(">" + sample_name+ "_2"+  "\n")
+                        else:
+                            out_f.write(line)
+
+rule generate_consensus:
+    shadow: "minimal"
+    input:
+        interval="outputs/vcf/filter/{sample}.vcf.gz",
+        quasi_in="outputs/quasi_species/merged/phased.vcf.gz",
+        quasi_tbx="outputs/quasi_species/merged/phased.vcf.gz.tbi",
+        bam="outputs/bams_merged/{sample}.bam",
+        coverage="outputs/coverage/{sample}.cov"
+    output:
+        fasta="outputs/consensus/phased/{sample}.fasta",
+        fasta_two="outputs/consensus/phased/{sample}_2.fasta"
+    run:
+        shell("touch {output.fasta}")
+        shell("touch {output.fasta_two}")
+        shell("{SCRIPTS_DIR}/generate_consensus.py  --coverage-in {input.coverage} -v {input.interval} -d 3 -p 1.0 -o {output.fasta} -c /dev/null -r {SARS_REF}        -i {input.bam} -s {wildcards.sample} -m {SITES_TO_MASK} --quasi-vcf {input.quasi_in} --phased")
+
+
+rule generate_coverage:
+    input:
+        bam="outputs/bams_merged/{sample}.bam"
+    output:
+        coverage="outputs/coverage/{sample}.cov"
+    run:
+        shell("bedtools genomecov -ibam {input.bam} -d > {output.coverage}")
+
+rule phased_final:
+    input:
+        vcf="outputs/quasi_species/merged/all.vcf",
+    output:
+        beagle5="outputs/quasi_species/merged/phased.vcf.gz",
+        quasi_tbx="outputs/quasi_species/merged/phased.vcf.gz.tbi",
+    run:
+        shell("cat {input.vcf}| bgzip -c > test2.vcf.gz")
+        shell("cat /u/home/s/smilefre/project-kruglyak/covid_runs/rerun_all_new_july20/uid_type/outputs/final/merged/quasi_species/all.vcf | bgzip -c > test3.vcf.gz")
+        shell("tabix -p vcf test2.vcf.gz")
+        shell("tabix -p vcf test3.vcf.gz")
+        shell("bcftools merge test2.vcf.gz test3.vcf.gz | bgzip -c > test1.vcf.gz")
+        shell("java -jar {SOFTWARE_PATH}/beagle/beagle.18May20.d20.jar gt=test1.vcf.gz out=test")
+        shell("cp test.vcf.gz {output.beagle5}")
+        shell("tabix -p vcf {output.beagle5}")
+
+
+rule vcf_filter:
+    shadow: "minimal"
+    input:
+        bam="outputs/bams_merged/{sample}.bam"
+    output:
+        vcf="outputs/vcf/filter/{sample}.vcf.gz",
+        tbi="outputs/vcf/filter/{sample}.vcf.gz.tbi"
+    run:
+        shell("bcftools mpileup -a FMT/DP -a FMT/AD -f {SARS_REF} {input.bam} | bcftools call -Ov -m | bgzip -c > test.vcf.gz && tabix -p vcf test.vcf.gz")
+        shell("bcftools view -e 'QUAL < {MIN_QUAL}|| MIN(FORMAT/DP) < {MIN_DEPTH} ' test.vcf.gz | bgzip -c > {output.vcf}")
+        shell("tabix -p vcf {output.vcf}")
+rule merge_bams:
+    shadow: "minimal"
+    input:
+        bam_in=get_bam_in
+    output:
+        bam="outputs/bams_merged/{sample}.bam",
+        bai="outputs/bams_merged/{sample}.bam.bai"
+    run:
+
+        for i, bam in enumerate(input.bam_in):
+            print(bam)
+            bam_sample_name = os.path.basename(bam).split(".bam")[0]
+            print(bam_sample_name)
+            coverage = meta_in["coverage_mean_dedup"][meta_in["merged_id"].isin([bam_sample_name])]
+            ## 15x
+            frac=  30.0/coverage 
+            frac = str(frac).split()[1]
+            if i == 0:
+                shell("samtools view -bh -s {frac} {bam} > test1.bam")
+            else:
+                shell("samtools view -bh -s {frac} {bam} > test2.bam")
+        shell("samtools merge -f test.bam test1.bam test2.bam")
+        shell("samtools sort test.bam > test.sorted.bam")
+        shell("java  -XX:ParallelGCThreads=1 -jar {PICARD_PATH} AddOrReplaceReadGroups I=test.sorted.bam O={output.bam} RGID=1 RGSM={wildcards.sample} RGLB=4 RGPL=ILLUMINA RGPU=unit1")
+        shell("samtools index {output.bam}")
+    
+

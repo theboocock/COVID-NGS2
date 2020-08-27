@@ -101,6 +101,9 @@ import shutil
 invert_bed = "bedtools subtract -a tmp.bed -b vcf_mask.bed > vcf_mask_invert.bed"
 #invert_bed = "cp vcf_mask.bed vcf_mask_invert.bed"
 ### ignore het sites ##  
+AWK_GET_HET_POSITIONS_PHASED="""
+    zcat {0} | grep -v "#" | grep "0|1\|1|0\|0|2\|2|0\|1|2\|2|1" |  awk 'BEGIN{{OFS="\t"}}{{print "sars2",$2-1,$2}}'  > vcf_phased.bed
+"""
 def get_consensus_fasta(reference_genome, sample, output_consensus, output_cov, snps_to_exclude_bed,phased,quasi_vcf,imputted):
 
     #if snps_to_exclude_bed is not None:
@@ -115,10 +118,14 @@ def get_consensus_fasta(reference_genome, sample, output_consensus, output_cov, 
     if phased:
         output_consensus_final = output_consensus.split(".fasta")[0]+ "_2.fasta"
         sample_cmd = __BCFTOOLS_SAMPLE_TEMPLATE__.format(quasi_vcf, sample)
-        print(sample_cmd)
+        print(AWK_GET_HET_POSITIONS_PHASED.format("sample.vcf.gz"))
+        ### get het_sites_phased ###
         subprocess.check_call(sample_cmd,shell=True)
-        set_one="""bcftools consensus -f {reference} -m vcf_mask_invert.bed -H 1 -s {sample} -o {output_consensus} sample.vcf.gz """.format(sample=sample, output_consensus=output_consensus, reference=reference_genome)
-        set_two ="""bcftools consensus -f {reference} -m vcf_mask_invert.bed -H 2 -s {sample} -o {output_consensus} sample.vcf.gz """.format(sample=sample, output_consensus=output_consensus_final,reference=reference_genome) 
+        subprocess.check_call(AWK_GET_HET_POSITIONS_PHASED.format("sample.vcf.gz"),shell=True)
+        bedtools_cmd_sub = "bedtools subtract -a vcf_mask_invert.bed -b vcf_phased.bed > vcf_test.bed"
+        subprocess.check_call(bedtools_cmd_sub, shell=True)
+        set_one="""bcftools consensus -f {reference} -m vcf_test.bed -H 1 -s {sample} -o {output_consensus} sample.vcf.gz """.format(sample=sample, output_consensus=output_consensus, reference=reference_genome)
+        set_two ="""bcftools consensus -f {reference} -m vcf_test.bed -H 2 -s {sample} -o {output_consensus} sample.vcf.gz """.format(sample=sample, output_consensus=output_consensus_final,reference=reference_genome) 
         print(set_one)
         try:
             subprocess.check_call(set_one,shell=True)
