@@ -53,7 +53,7 @@ SRR10903401 SRR10903401_1.fastq.gz SRR10903401_2.fastq.gz
 To run the pipeline  
 
 ```
-snakemake -j 8 --config sample_list=<SAMPLE LIST IN> --snakefile <PATH TO Snakefile_ngs_covid19> 
+snakemake -j 8 --config sample_list=<SAMPLE LIST IN> --snakefile <PATH TO Snakefile_ngs_covid19_dev> 
 ```
 
 
