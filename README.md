@@ -34,7 +34,7 @@ This package consists of different pipelines for processing COVID19 WGS data.
 To date there are two main pipelines 
 
 
-1. Processing NGS genomes, performing QC, and integrating this data with the publicly avaliable genomes.  (Snakefile=Snakemake_ngs_covid19)
+1. Processing NGS genomes, performing QC, and integrating this data with the publicly avaliable genomes.  (Snakefile=Snakemake_ngs_covid19_dev)
 2. Proprocess public genomes from gissaid into useful file-formats for genomics such as VCF and phylogenetic trees. (Snakefile=Snakefile_proess_gisaid)
 
 
@@ -46,14 +46,15 @@ The pipeline expects only a single space-delimited file as input. The file has 3
 Example file input 
 
 ```
-SRR10902284 SRR10902284_1.fastq.gz NA
-SRR10903401 SRR10903401_1.fastq.gz SRR10903401_2.fastq.gz
+UID sample  fastq_one fastq_two lib_type uid_sample_type
+U0001   1   1_R1_fastq.gz  1_R2_fastq.gz    neb U0001_neb
+U0002   2   2_R1_fastq.gz   2_R2_fastq.gz   amp U0002_amp
 ``` 
 
 To run the pipeline  
 
 ```
-snakemake -j 8 --config sample_list=<SAMPLE LIST IN> --snakefile <PATH TO Snakefile_ngs_covid19_dev> 
+snakemake -j 8 --use-conda --config merge_rule="column_uid_sample_type" sample_list=<SAMPLE LIST IN> --snakefile <PATH TO Snakefile_ngs_covid19_dev> 
 ```
 
 
