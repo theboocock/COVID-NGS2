@@ -1,0 +1,114 @@
+# This is where we define which builds we'd like to run.
+# This example includes 4 separate builds, ranging from the regional (global) to location (county) level.
+# You can comment-out, remove, or add as many builds as you'd like.
+
+# Each build needs a name, a defined subsampling process, and geographic attributes used for subsampling.
+# Geography is specified by build attributes (e.g., `region`, `country`, `division`, `location`) that are referenced from subsampling schemes.
+
+# The default config file, `./defaults/parameters.yaml` has reasonable default subsampling methods for each geographic resolution.
+# These subsample primarily from the area of interest ("focus"), and add in background ("contextual") sequences from the rest of the world.
+# Contextual sequences that are genetically similar to (hamming distance) and geographically near the focal sequences are heavily prioritized.
+
+# In this example, we use these default methods. See other templates for examples of how to customize this subsampling scheme.
+
+builds:
+  # Focus on King County (location) in Washington State (division) in the USA (country)
+  # with a build name that will produce the following URL fragment on Nextstrain/auspice:
+  # /ncov/north-america/usa/washington/king-county
+  north-america_usa_los-angeles_hets_curate_three: # name of the build; this can be anything
+    subsampling_scheme: location # what subsampling method to use (see parameters.yaml)
+    region: North America
+    country: USA
+    division: California 
+    location: Los Angeles County
+    #north-america_usa_los-angeles_two: # name of the build; this can be anything
+  #subsampling_scheme: location # what subsampling method to use (see parameters.yaml)
+    #region: North America
+    #country: USA
+    #division: California 
+    #    location: Los Angeles County
+    # Whatever your lowest geographic area is (here, 'location' since we are doing a county in the USA)
+    # list 'up' from here the geographic area that location is in.
+    # Here, King County is in Washington state, is in USA, is in North America.
+
+  # Zoom out one level: this build focuses on all of Washington State
+  # with a build name that will produce the following URL fragment on Nextstrain/auspice:
+  # /ncov/north-america/usa/washington
+  #north-america_usa_california:
+  #  subsampling_scheme: division # we named the subsampling scheme meant for divisions accordingly; you can rename these whatever you'd like
+  #  region: North America
+  #  country: USA
+  #  division: California 
+    # Here, Washington state is in USA, is in North America.
+
+  # This build focuses on the entire U.S.
+  # with a build name that will produce the following URL fragment on Nextstrain/auspice:
+  # /ncov/north-america/usa
+  ##north-america_usa:
+  #    subsampling_scheme: country
+  #    region: North America
+  #    country: USA
+    # Here, USA is in North America
+  # This build focuses on all of North America
+  # with a build name that will produce the following URL fragment on Nextstrain/auspice:
+  # /ncov/north-america
+  ## north-america:
+  #subsampling_scheme: region
+  #  region: North America
+
+  # This build samples evenly from the globe
+  # with a build name that will produce the following URL fragment on Nextstrain/auspice:
+  # /ncov/global
+  #global:
+  #  subsampling_scheme: region_global
+  #  region: global
+  
+  
+    #la_all_worldwide:
+    #subsampling_scheme: la_division
+    #region: North America
+    #country: USA
+    #division: California 
+
+
+# Here, you can specify what type of auspice_config you want to use
+# and what description you want. These will apply to all the above builds.
+# If you want to specify specific files for each build - you can!
+# See the 'example_advanced_customization' builds.yaml
+files:
+  auspice_config: "my_profiles/example/my_auspice_config.json"
+  description: "my_profiles/example/my_description.md"
+ 
+subsampling: 
+  la:
+      group_by: "year month"
+      seq_per_group: 500
+      exclude: "--exclude-where 'location!=Los Angeles County'"
+
+  la_division:
+      # Focal samples for division
+      #
+      la:
+        group_by: "year month"
+        seq_per_group: 500
+        exclude: "--exclude-where 'location!=Los Angeles County'"
+      california:
+        group_by: "year month"
+        seq_per_group: 300
+        exclude: "--exclude-where 'division!=California' 'location=Los Angeles County'"
+      # Contextual samples from division's country ###
+      country:
+        group_by: "division year month"
+        seq_per_group: 50
+        exclude: "--exclude-where 'region!={region}' 'country!={country}' 'division=California'"
+      # Contextual samples from division's region#
+      region:
+        group_by: "country year month"
+        seq_per_group: 50
+        exclude: "--exclude-where 'region!={region}' 'country={country}'"
+      # Contextual samples from the rest of the world, excluding the current
+      # division to avoid resampling.
+      global:
+        group_by: "country year month"
+        seq_per_group: 5
+        exclude: "--exclude-where 'region={region}'"
