@@ -54,7 +54,7 @@ U0002   2   2_R1_fastq.gz   2_R2_fastq.gz   amp
 To run the pipeline  
 
 ```
-snakemake -j 8 --config sample_list=<SAMPLE LIST IN> --snakefile <PATH TO Snakefile_ngs_covid19_dev> 
+snakemake -j 8 --use-conda --config sample_list=<SAMPLE LIST IN> --snakefile <PATH TO Snakefile_ngs_covid19_dev> 
 ```
 
 
