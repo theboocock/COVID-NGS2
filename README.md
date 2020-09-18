@@ -46,15 +46,15 @@ The pipeline expects only a single space-delimited file as input. The file has 3
 Example file input 
 
 ```
-UID sample  fastq_one fastq_two lib_type
-U0001   1   1_R1_fastq.gz  1_R2_fastq.gz    neb
-U0002   2   2_R1_fastq.gz   2_R2_fastq.gz   amp 
+UID sample  fastq_one fastq_two lib_type uid_sample_type
+U0001   1   1_R1_fastq.gz  1_R2_fastq.gz    neb U0001_neb
+U0002   2   2_R1_fastq.gz   2_R2_fastq.gz   amp U0002_amp
 ``` 
 
 To run the pipeline  
 
 ```
-snakemake -j 8 --use-conda --config sample_list=<SAMPLE LIST IN> --snakefile <PATH TO Snakefile_ngs_covid19_dev> 
+snakemake -j 8 --use-conda --config merge_rule="column_uid_sample_type" sample_list=<SAMPLE LIST IN> --snakefile <PATH TO Snakefile_ngs_covid19_dev> 
 ```
 
 
