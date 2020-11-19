@@ -46,6 +46,7 @@ region = "North America"
 strain_name = sample_in$V4 
 fasta_name = sample_in$V4 
 
+
 df_meta = data.frame(sample=fasta_name, strain=strain_name, sample_type = sample_type, virus="ncov", gisaid_epi_isl="?", gennbak_acession="?",region=region, country="USA",
 					division="California", location="Los Angeles", region_exposure=region,country_exposure="USA", division_exposure=division,segment="genome",length=length_default
 				  ,host=host_default,age="?",sex="?",originating_lab="UCLA",submitting_lab="UCLA", authors="UCLA",url="NA",title="NA",date_submitted=default_date, lib_name=sample_in$V1, fastq_one =sample_in$V2, fastq_two = sample_in$V3,run_name=sample_in$V5)
@@ -56,16 +57,24 @@ uid = str_replace_all(uid,"U","")
 uids = sprintf("U%04i",as.numeric(uid))
 df_meta$uid = uids
 df_merged = merge(df_meta,clin_in,by.x="uid",by.y="ID",all.x=TRUE)
-
+df_merged["uid.y"] =  NULL
+print(df_merged)
 
 if(!is.na(sample_sheet)){
     print("Sample sheet found, skipping clinical inforamtion")
-    ss_in = read.csv(sample_sheet, header=T)
+    ss_in = read.delim(sample_sheet, header=T)
     lib_name = unlist(lapply(str_split(df_merged$lib_name,"_"), function(x){x[1]}))
     df_merged$lib_name_short = lib_name
-    df_merged = merge(df_merged, ss_in, by.y=1,by.x="lib_name_short")
+    ss_in$lib_name_short = unlist(lapply(str_split(ss_in$Sample_ID,"_"), function(x){x[1]}))
+    print(head(ss_in))
+    df_merged = merge(df_merged, ss_in, by.y="lib_name_short",by.x="lib_name_short")
     oligos_used = df_merged$oligos_used
-    oligos_used = unlist(lapply(str_split(oligos_used,"\\|"), function(x) { paste(x, collapse=",")}))
+    df_merged$sample = df_merged$sample.y
+    if(is.null(oligos_used)){
+        oligos_used = rep("3,4",length(df_merged$lib_name_short))
+    }else{
+        oligos_used = unlist(lapply(str_split(oligos_used,"\\|"), function(x) { paste(x, collapse=",")}))
+    }
     df_merged$uid = df_merged$uid.x
     df_merged$oligos_used = oligos_used
     if ("library_type" %in% colnames(df_merged)){

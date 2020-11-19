@@ -63,11 +63,18 @@ def make_sample_sheet(sample_sheet,  experiment_name,date, sample_sheet_neb, sam
     pd_in["index"] = pd_in["index"].apply(np.char.upper)
     pd_in["index2"] = pd_in["index2"].apply(np.char.upper)
     pd_in["Sample_ID"]  = pd_in["sample"] + "_" + pd_in["uid"]
+    pd_in["library_type"] = "amp_complicated"
+    pd_in["sample_type"] = "amp"
+    pd_in["uid_sample_type"] = pd_in["uid"] + "_" + pd_in["sample_type"]
+    pd_in["library_type"][pd_in["sample"].str.contains("NEB")] = "neb"
+    if "oligos_used" not in pd_in.columns:
+        # Hack to get the columns right
+        pd_in["oligos_used"] = "3,4"
     neb_df  = pd_in[neb] 
     amp_df =  pd_in[amp]
     amp_df_first = amp_df.copy()
     neb_df_first = neb_df.copy()
-    print(amp_df_first.shape)
+    pd_in["sample"] = list(range(1,pd_in.shape[0]+1))
     for i in range(2,5):
         tmp_row = neb_df_first.copy()
         tmp_row["Lane"] = i
@@ -81,6 +88,7 @@ def make_sample_sheet(sample_sheet,  experiment_name,date, sample_sheet_neb, sam
     with open(sample_sheet_amp, "w") as out_f:
         out_f.write(sheet_line)
         amp_df.to_csv(out_f, mode="a",index=False)
+    pd_in.to_csv("sample_sheet.csv",index=False, sep="\t")
 
 
 import subprocess
@@ -91,7 +99,7 @@ def run_bcl2fastq(sample_sheet_neb, sample_sheet_amp):
     neb_cmd = __bcl_to_fastq__.format(run_folder=".",sample_sheet=sample_sheet_neb, barcode_mismatches=1)
     subprocess.check_call(neb_cmd, shell=True)
     amp_cmd = __bcl_to_fastq__.format(run_folder=".",sample_sheet=sample_sheet_amp, barcode_mismatches=0)
-    subprocess.check_call(amp_cmd, shell=True)
+    #subprocess.check_call(amp_cmd, shell=True)
 
 def main():
 

@@ -144,7 +144,12 @@ def get_consensus_fasta(reference_genome, sample, output_consensus, output_cov, 
             except:
                 pass
         else:
-            subprocess.check_call("cat vcf_mask_invert.bed vcf_het.bed | sort -k 2,2g | bedtools merge -i stdin > vcf_het_mask_invert.bed",shell=True)
+            sample_cmd = __BCFTOOLS_SAMPLE_TEMPLATE__.format(quasi_vcf, sample)
+            subprocess.check_call(sample_cmd,shell=True)
+            #TODO: ensure het indels are masked#
+            sample_cmd = AWK_GET_MISSING_POSITIONS.format("sample.vcf.gz", sample)
+            subprocess.check_call(sample_cmd,shell=True)
+            subprocess.check_call("cat vcf_mask_invert.bed vcf_het.bed vcf_missing.bed | sort -k 2,2g | bedtools merge -i stdin > vcf_het_mask_invert.bed",shell=True)
             con_cmd = __BCFTOOLS_CONSENSUS_TEMPLATE__.format(sample, reference_genome, "con.fasta")
             subprocess.check_call(con_cmd,shell=True)
         with open("con.fasta") as con:
