@@ -2,6 +2,7 @@ name: r_covid
 channels:
   - bioconda
   - conda-forge
+  - conda-forge/label/broken
   - defaults
   - r
 dependencies:

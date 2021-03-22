@@ -208,7 +208,7 @@ rule generate_final_dataset_package:
         ## Now merged with metadata .... ### 
         out_df = out_df.merge(metadata,left_on="uid_lib",right_on="id_library_type")
         out_df = out_df.drop_duplicates(subset=["uid_lib"])
-        out_df =  out_df.drop(columns=["sample_x","sample_y","strain","lib_name","fastq_one","fastq_two","run_name"])
+        out_df =  out_df.drop(columns=["strain","lib_name","fastq_one","fastq_two","run_name"])
         out_df=out_df.fillna(value="NA")
         sample_name_fasta_vcf = [key.replace("_","-") for key in mapped_uid.keys() ]
         out_df["sample_name_fasta"] = sample_name_fasta_vcf

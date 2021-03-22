@@ -24,4 +24,4 @@ paste -d ' ' samples1.txt run_names.txt > samples2.txt
 Rscript $folder/create_next_metadata.R samples2.txt $OUTPUT $CLIN_IN $SAMPLE_TYPE $SAMPLE_SHEET
 rm samples1.txt
 rm run_names.txt
-rm samples2.txt
+#rm samples2.txt
