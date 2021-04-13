@@ -18,6 +18,7 @@ metadata=fastq_match(config)
 #metadata = metadata[metadata["sample"].isin([72,83,107,131,367])]
 samples=metadata["sample"]
 # uid type merges libraries across samples
+
 try:
     if config["merge_rule"] == "uid_type": 
         mapped_uid, sample_names_hash, mapped_uids_read_one, mapped_uids_read_two = uid_library_to_sample_name_and_readgroup()
@@ -28,7 +29,9 @@ try:
     elif config["merge_rule"] == "uid_oligo":
         mapped_uid, sample_names_hash, mapped_uids_read_one, mapped_uids_read_two = uid_library_to_sample_hash(merge_rule="uid_oligo") 
     elif config["merge_rule"] == "column_uid_sample_type":
-        mapped_uid, sample_names_hash, mapped_uids_read_one, mapped_uids_read_two = uid_library_to_sample_hash(merge_rule="column_uid_sample_type") 
+        mapped_uid, sample_names_hash, mapped_uids_read_one, mapped_uids_read_two = uid_library_to_sample_hash(merge_rule="column_uid_sample_type")
+    elif config["merge_rule"] == "per_sample":
+        mapped_uid, sample_names_hash, mapped_uids_read_one, mapped_uids_read_two = uid_library_to_sample_hash(merge_rule="per_sample")
 
 except KeyError:
     mapped_uid, sample_names_hash, mapped_uids_read_one, mapped_uids_read_two = uid_library_to_sample_name_and_readgroup()
