@@ -1,4 +1,6 @@
 #!/usr/bin/env Rscript
+
+print("HERE")
 library(S4Vectors)
 library(ShortRead)
 library(Biostrings)
@@ -41,7 +43,7 @@ trimReadsAmp=function(    #read1
                         # sometimes just read 2 is sometimes all dark cycles , remove these reads
                         polyG="GGGGGGGGGG",
                         #both read 1 and read 2 should be longer than this amount$
-                        min.length.filter=50
+                        min.length.filter=30
                     ){
     fi1 = FastqStreamer(in.file1, nbuffer, readerBlockSize = 1e9, verbose = T)
     fi2 = FastqStreamer(in.file2, nbuffer, readerBlockSize = 1e9, verbose = T)
@@ -166,7 +168,7 @@ trimReadsArctic=function(    #read1
                         # sometimes just read 2 is sometimes all dark cycles , remove these reads
                         polyG="GGGGGGGGGG",
                         #both read 1 and read 2 should be longer than this amount
-                        min.length.filter=50,
+                        min.length.filter=30,
                         RTprimerExtraL='CTCGATGGAG'
                         
                     ){
@@ -264,6 +266,7 @@ trimReadsArctic=function(    #read1
 # some input stuff for running in R
 args = commandArgs(trailingOnly=T)
 fastq_one= args[1] 
+print(fastq_one)
 fastq_two = args[2] 
 fastq_out_one = args[3]
 fastq_out_two = args[4]

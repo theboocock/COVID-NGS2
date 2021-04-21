@@ -99,8 +99,11 @@ rule create_quasi_species_vcf:
         "outputs/final/merged/all.vcf.gz"
     output:
         "outputs/final/merged/quasi_species/all.vcf"
-    shell:
-        "{SCRIPTS_DIR}/vcf_filter/allelic_balance.py --vcf {input} -o {output}"
+    run:
+        try:
+            shell("{SCRIPTS_DIR}/vcf_filter/allelic_balance.py --vcf {input} -o {output}")
+        except:
+            shell("touch {output}")
 
 rule create_merged_quasi_species_vcf:
     group: "vcf_output"
@@ -224,9 +227,12 @@ rule combine_filtered_vcf:
         vcfs = expand("outputs/bcftools_vcfs/merged/filt/{intervals}/{sample}.snps_and_indels.vcf.gz",intervals=intervals, sample=mapped_uid.keys())
     output:
         "outputs/bcftools_vcfs/merged/filt/sars2/all.vcf.gz"
-    shell:
+    run:
+        if len(input.vcfs) == 1:
+            shell(" bcftools view -v snps,indels {input.vcfs} | bgzip -c > {output} &&  tabix -p vcf {output}")
+        else:
         #"bcftools merge {input.vcfs} | bcftools view -v snps,indels | bedtools intersect -v -a stdin -b {SITES_TO_MASK} -header | bgzip -c > {output} &&  tabix -p vcf {output}"
-        "bcftools merge {input.vcfs} | bcftools view -v snps,indels | bgzip -c > {output} &&  tabix -p vcf {output}"
+            shell("bcftools merge {input.vcfs} | bcftools view -v snps,indels | bgzip -c > {output} &&  tabix -p vcf {output}")
 
 
 rule annovar_vcf:

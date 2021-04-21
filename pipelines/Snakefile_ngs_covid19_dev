@@ -211,7 +211,11 @@ rule generate_final_dataset_package:
         ## Now merged with metadata .... ### 
         out_df = out_df.merge(metadata,left_on="uid_lib",right_on="id_library_type")
         out_df = out_df.drop_duplicates(subset=["uid_lib"])
-        out_df =  out_df.drop(columns=["strain","lib_name","fastq_one","fastq_two","run_name"])
+        try:
+            out_df =  out_df.drop(columns=["strain","lib_name","fastq_one","fastq_two","run_name"])
+        except:
+            out_df.drop(columns=["lib_name","fastq_one","fastq_two"])
+
         out_df=out_df.fillna(value="NA")
         sample_name_fasta_vcf = [key.replace("_","-") for key in mapped_uid.keys() ]
         out_df["sample_name_fasta"] = sample_name_fasta_vcf
@@ -234,6 +238,7 @@ rule generate_final_dataset_package:
                 kept_ids.append(merged_id)
             with open("tmp_sample_list.txt","w") as out_f: 
                 for sample in kept_ids:
+                    print(sample)
                     out_f.write(sample.replace("_","-")+ "\n")
             shell("bcftools view -S tmp_sample_list.txt {input.merged_vcf} | bgzip -c > {output.final_vcf} && tabix -p vcf {output.final_vcf}")
             os.remove("tmp_sample_list.txt")

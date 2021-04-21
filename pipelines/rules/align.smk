@@ -279,7 +279,7 @@ rule bwa_map:
         read_one="outputs/fastqs/{sample}.R1.fastq.gz",
         read_two="outputs/fastqs/{sample}.R2.fastq.gz"
     output:
-        temp("outputs/mapping_stats/align/{sample}.bam")
+        ("outputs/mapping_stats/align/{sample}.bam")
     params:
         rg=get_rg
     group: "align2"
