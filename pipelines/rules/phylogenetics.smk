@@ -6,6 +6,7 @@ rule merge_in_pango:
     input:
         merged_csv="outputs/final/merged/qc_report.tsv.inco",
         merged_csv_unfiltered="outputs/qc_report/merged/qc_report.tsv.inco",
+        pango_in="outputs/pangolin/lineages.csv"
     output:
         merged_csv="outputs/final/merged/qc_report.tsv",
         merged_csv_unfiltered="outputs/qc_report/merged/qc_report.tsv"
@@ -13,6 +14,7 @@ rule merge_in_pango:
         try:
             out_df = pd.read_csv(input.merged_csv,sep="\t")
             out_df2= pd.read_csv(input.merged_csv_unfiltered,sep="\t")
+            pango_in = pd.read_csv(input.pango_in, sep=",")
             out_df2 = out_df2.merge(pango_in, left_on="read_group_name", right_on="taxon", how="outer")
             out_df.to_csv(output.merged_csv, sep="\t",index=False)
             out_df2.to_csv(output.merged_csv_unfiltered, sep="\t",index=False)
