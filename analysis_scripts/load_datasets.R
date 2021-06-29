@@ -4,8 +4,9 @@ library(data.table)
 ### Load in the QC input file ###
 library(Biostrings)
 library(stringr)
+library(glue)
 #source("R/load_datasets.R")
-qc_input2 = read.delim("~/KRUGLYAK//covid_runs/rerun_all_new_july20/uid_type/outputs/qc_report/merged//qc_report.tsv")
+qc_input2 = read.delim("data/qc_report.tsv")
 bins_ct = cut(qc_input2$ct,breaks=c(0,15,20,25,40))
 qc_input2$bin_ct= bins_ct
 qc_input2$library_type = sapply(str_split(qc_input2$id_library_type,"_"),function(x){x[2]})
@@ -23,11 +24,12 @@ library(lubridate)
 qc_lineages$date_fix = mdy(qc_lineages$date)
 qc_lineages$week =  week(qc_lineages$date_fix)
 qc_lineages$month = month(qc_lineages$date_fix)
+
 qc_lineages$strain = qc_lineages$sample_name_fasta
 qc_lineages$pangolin_lineage = qc_lineages$lineage
-phased_genomes = readDNAStringSet("~/KRUGLYAK/covid_runs/rerun_all_new_july20/uid_type/outputs/consensus/merged/phased/sars2/all_3_none.fasta")
-phased_genomes_curate = readDNAStringSet("~/KRUGLYAK/covid_runs/rerun_all_new_july20/uid_type/phased/consensus/all.fasta")
-final_genomes = readDNAStringSet("~/KRUGLYAK/covid_runs/rerun_all_new_july20/uid_type/outputs/final/merged/all.fasta")
+phased_genomes = readDNAStringSet("data/all_3_none.fasta")
+phased_genomes_curate = readDNAStringSet("data/phased.fasta")
+final_genomes = readDNAStringSet("data/all.fasta")
 names_phased = names(phased_genomes) 
 phased_genome_names = unlist(lapply(str_split(names_phased,":"), function(x){x[1]}))
 name_final_genomes = str_replace_all(names(final_genomes),"-","_")
@@ -73,11 +75,13 @@ writeXStringSet(two_lineages, filepath = "data/phased_genomes_two_lineages.fasta
 xstringset = readDNAStringSet(("data/gisaid/sequences_2020-07-10_23-53.fasta"))
 library(data.table)
 gisaid = fread("data/gisaid/metadata_2020-07-10_23-53.tsv")
-new_pango_gisaid = read.table("~/KRUGLYAK/covid_runs/rerun_all_new_july20/pangolin_gisaid/outputs/pangolin/lineages_merged.csv",sep=",",header=T)
+new_pango_gisaid = read.table("data/lineages_merged.csv",sep=",",header=T)
 gisaid = gisaid %>% left_join(new_pango_gisaid,by=c("strain"="taxon"))
 gisaid$date_fix= ymd(gisaid$date)
 gisaid$pangolin_lineage = gisaid$lineage
 gisaid$probability = gisaid$probability
+
+#qc_input2[!(qc_input2$merged_id %in% bad_samples$merged_id),]
 
 bad_samples = read.csv("data/long_sample_list_august19th.csv")
 bad_sample_names = c(str_replace_all(bad_samples$merged_id,"_","-"),paste(bad_samples$merged_id,"_2",sep=""),paste(bad_samples$merged_id,"_1",sep=""))
@@ -96,17 +100,18 @@ qc_lineages_phased$location = "Los Angeles County"
 qc_lineages_phased$strain = str_replace_all(qc_lineages_phased$strain,":","_")
 #colnames(gisaid)[!colnames(gisaid) %in% colnames(qc_lineages_phased)]
 qc_lineages_phased = qc_lineages_phased %>% filter(!(strain %in% bad_sample_names))
+qc_lineages_phased$date_submitted = ymd(qc_lineages_phased$date_submitted)
 gisaid_phased = qc_lineages_phased %>% select(colnames(qc_lineages_phased)[colnames(qc_lineages_phased) %in% colnames(gisaid)]) %>% bind_rows(gisaid)
 gisaid_phased$date = gisaid_phased$date_fix
 gisaid_phased$strain = str_replace_all(gisaid_phased$strain,":","_")
 gisaid_phased$la_county = ifelse(gisaid_phased$location == "Los Angeles County","Los Angeles County","Other")
 #gisaid_phased = gisaid_phased[gisaid_phased$probability > .8,]
 
-write.table(as.data.frame(gisaid_phased),file="~/Dropbox/COVID19/ncov_new/again/ncov/data/merged/phased.tsv",col.names=T,row.names=F,quote=F,sep="\t")
-aa = c(keep_genomes[qc_lineages_phased$sample_name_fasta],xstringset)
-writeXStringSet(aa,file="~/Dropbox/COVID19/ncov_new/again/ncov/data/merged/phased.fasta")
+#write.table(as.data.frame(gisaid_phased),file="~/Dropbox/COVID19/ncov_new/again/ncov/data/merged/phased.tsv",col.names=T,row.names=F,quote=F,sep="\t")
+#aa = c(keep_genomes[qc_lineages_phased$sample_name_fasta],xstringset)
+#writeXStringSet(aa,file="~/Dropbox/COVID19/ncov_new/again/ncov/data/merged/phased.fasta")
 ##### 
-pangolin_new_lineages =read.csv("~/KRUGLYAK/covid_runs/rerun_all_new_july20/uid_type/phased/pangolin/lineages.csv")
+pangolin_new_lineages =read.csv("data/lineages.csv")
 qc_lineages_phased2 = qc_lineages_phased %>% left_join(pangolin_new_lineages,by=c("strain"="taxon")) %>% mutate(pangolin_lineage= ifelse(is.na(lineage.y),pangolin_lineage,lineage.y),probability= ifelse(is.na(lineage.y),probability.x,probability.y))
 #qc_lineages_phased2 %>%rename(pangolin_lineage,pcox)
 gisaid_phased = qc_lineages_phased2 %>% select(colnames(qc_lineages_phased2)[colnames(qc_lineages_phased2) %in% colnames(gisaid)]) %>% bind_rows(gisaid)
@@ -121,10 +126,10 @@ gisaid_phased$la_county = ifelse(gisaid_phased$location == "Los Angeles County",
 
 #gisaid_phased = gisaid_phased %>% filter(strain %in% current_run$V1)
 
-write.table(gisaid_phased,file="~/Dropbox/COVID19/ncov_new/again/ncov/data/merged/phased_curate.tsv",col.names=T,row.names=F,quote=F,sep="\t")
+#write.table(gisaid_phased,file="~/Dropbox/COVID19/ncov_new/again/ncov/data/merged/phased_curate.tsv",col.names=T,row.names=F,quote=F,sep="\t")
 aa = c(keep_genomes_2,xstringset)
 #aa = aa[gisaid_phased$strain]
-writeXStringSet(aa,file="~/Dropbox/COVID19/ncov_new/again/ncov/data/merged/phased_curate.fasta")
+#writeXStringSet(aa,file="~/Dropbox/COVID19/ncov_new/again/ncov/data/merged/phased_curate.fasta")
 
 # switch lineages ##
 subset_genomes = final_genomes[qc_lineages$sample_name_fasta]
@@ -135,12 +140,12 @@ qc_lineages$strain = qc_lineages$sample_name_fasta
 qc_lineages$location = "Los Angeles County"
 colnames(gisaid)[!colnames(gisaid) %in% colnames(qc_lineages)]
 #qc_lineages
-
+qc_lineages$date_submitted = ymd(qc_lineages$date_submitted)
 gisaid_local = qc_lineages %>% select(colnames(qc_lineages)[colnames(qc_lineages) %in% colnames(gisaid)]) %>% bind_rows(gisaid)
 aa = c(subset_genomes,xstringset)
 gisaid_local$date = gisaid_local$date_fix
-write.table(gisaid_local,file="~/Dropbox/COVID19/ncov_new/again/ncov/data/merged/final.tsv",col.names=T,row.names=F,quote=F,sep="\t")
-writeXStringSet(aa,file="~/Dropbox/COVID19/ncov_new/again/ncov/data/merged/final.fasta")
+#write.table(gisaid_local,file="~/Dropbox/COVID19/ncov_new/again/ncov/data/merged/final.tsv",col.names=T,row.names=F,quote=F,sep="\t")
+#writeXStringSet(aa,file="~/Dropbox/COVID19/ncov_new/again/ncov/data/merged/final.fasta")
 ### Only LA with Wuhan and LA ####
 #
 #calif_wuhan = gisaid %>% filter(location == "Los Angeles County" | grepl("Hu-1",strain))
@@ -166,8 +171,8 @@ df_phased$strain = df_phased$fasta_name
 calif_wuhan = gisaid %>% filter(grepl("Hu-1",strain))
 out_seq = c(keep_genomes,xstringset[calif_wuhan$strain])
 gisaid_la_hets = df_phased %>% select(colnames(df_phased)[colnames(df_phased) %in% colnames(gisaid)]) %>% bind_rows(calif_wuhan)
-write.table(gisaid_la_hets ,file="~/Dropbox/COVID19/ncov_new/again/ncov/data/merged/final_only_la._het.tsv",col.names=T,row.names=F,quote=F,sep="\t")
-writeXStringSet(out_seq,file="~/Dropbox/COVID19/ncov_new/again/ncov/data/merged/final_only_la_hets.fasta")
+#write.table(gisaid_la_hets ,file="~/Dropbox/COVID19/ncov_new/again/ncov/data/merged/final_only_la._het.tsv",col.names=T,row.names=F,quote=F,sep="\t")
+#writeXStringSet(out_seq,file="~/Dropbox/COVID19/ncov_new/again/ncov/data/merged/final_only_la_hets.fasta")
 
 
 #### Het phylogenies ###
@@ -179,7 +184,7 @@ writeXStringSet(out_seq,file="~/Dropbox/COVID19/ncov_new/again/ncov/data/merged/
 gisaid = fread("data/gisaid/metadata_2020-07-10_23-53.tsv")
 #gisaid = gisaid %>% left_join(california,by=c("strain"="seqName"))
 gisaid$date_fix = ymd(gisaid$date)
-new_pango_gisaid = read.table("~/KRUGLYAK/covid_runs/rerun_all_new_july20/pangolin_gisaid/outputs/pangolin/lineages_merged.csv",sep=",",header=T)
+new_pango_gisaid = read.table("data/lineages_merged.csv",sep=",",header=T)
 gisaid$week = week(gisaid$date_fix)
 gisaid_strain = gisaid %>% left_join(new_pango_gisaid,by=c("strain"="taxon"))
 gisaid_strain$pangolin_lineage = gisaid_strain$lineage
@@ -214,9 +219,8 @@ gisaid_phased_filt = gisaid_phased_filt %>% mutate(location=ifelse(location == "
 gisaid_phased_filt = gisaid_phased_filt %>% mutate(location=ifelse(location == "San Francisco County","San Francisco",location))
 gisaid_phased_filt = gisaid_phased_filt %>% mutate(month=month(date_fix),week=week(date_fix))
 #gisaid_local = qc_lineages %>% select(colnames(qc_lineages)[colnames(qc_lineages) %in% colnames(gisaid)]) %>% bind_rows(gisaid)
-lineages_manual = read.csv("~/KRUGLYAK/covid_runs/rerun_all_new_july20/uid_type/phased/pangolin/lineages.csv")
+lineages_manual = read.csv("data/lineages.csv")
 #lineages_manual %>% write.table(file="data/S4.tsv",col.names=T,row.names=F,quote=F)
 lineages_manual  =lineages_manual %>% mutate(sample=str_replace_all(str_replace_all(taxon,"_[0-2]$",""),"_","-")) %>% group_by(sample) %>% summarise(g1=lineage[1],g2=lineage[2])
 lineages_manual$ordered_lineages = apply(cbind(lineages_manual$g1,lineages_manual$g2), 1, function(x){paste(sort(x),sep=",",collapse = ",")})
-
 ## ##

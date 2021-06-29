@@ -1,61 +1,29 @@
 library(treeio)
 library(ggtree)
 library(tidyverse)
+library(cowplot)
+library(castor)
+
 source("R/utils.R")
 source("R/load_datasets.R")
 
 
-## 4Ne [p ln p + (1-p) ln (1-p)] generations
-
-
-c("submitter"	,
-  "fn",
-  "covv_virus_name",
-  "covv_type",
-  "covv_passage",
-  "covv_collection_date",
-  "covv_location",
-  "covv_add_location",
-  "covv_host",
-  "covv_add_host_info",
-  "covv_gender",
-  "covv_patient_age",
-  "covv_patient_status",
-  "covv_specimen",
-  "covv_outbreak",
-  "covv_last_vaccinated",
-  "covv_treatment",
-  "covv_seq_technology",
-  "covv_assembly_method",
-  "covv_coverage",
-  "covv_orig_lab",
-  "covv_orig_lab_addr",
-  "covv_provider_sample_id",
-  "covv_subm_lab",
-  "covv_subm_lab_addr",
-  "covv_subm_sample_id",
-  "covv_authors")
-
-### 
-test_genomes = c("LA_0171","LA_0260","LA_0081","LA_0258","LA_0193","LA_0239")
-
-- 4 * 1000 *1/2000*log(1/2000)
 #### Write out tables ###
-write.table(gisaid_phased_filt,file="data/gisaid_all.txt",quote=F,row.names=F,col.names=T, sep="\t")
+#write.table(gisaid_phased_filt,file="data/gisaid_all.txt",quote=F,row.names=F,col.names=T, sep="\t")
 #gisaid_phased_filt$probability[match(lineages_manual$taxon, gisaid_phased_filt$strain)] = lineages_manual$probability
 #gisaid_phased_filt$pangolin_lineage[match(lineages_manual$taxon, gisaid_phased_filt$strain)] = lineages_manual$lineage
-gisaid_phased_filt %>% filter(submitting_lab == "UCLA") %>%   select(strain,pangolin_lineage,probability) %>% write.table("paper/tables/S2.tsv", quote=F,row.names=F,col.names=T,sep="\t")
+#gisaid_phased_filt %>% filter(submitting_lab == "UCLA") %>%   select(strain,pangolin_lineage,probability) %>% write.table("paper/tables/S2.tsv", quote=F,row.names=F,col.names=T,sep="\t")
 gisaid_phased_filt %>% filter(submitting_lab != "UCLA") %>%   select(strain,pangolin_lineage,probability) %>% write.table("paper/tables/S3.tsv", quote=F,row.names=F,col.names=T,sep="\t")
 gisaid_phased_filt %>% filter(submitting_lab != "UCLA") %>% arrange(date_fix) %>% filter(strain != "USA/CA-ALSR-0513-SAN/2020") %>% filter(grepl("B.1",pangolin_lineage)) %>% filter(country == "USA") %>% head(n=20)  %>% write.table("paper/tables/S7.tsv", quote=F,row.names=F, col.names=T,sep="\t")
 gisaid_phased_filt %>% select(-GISAID_clade,-lineage,-probability)%>%  filter(pangolin_lineage == "B.1.43") %>% select(strain,region,division,country,location,submitting_lab) %>% write.table("paper/tables/S4.tsv",quote=F,row.names=F,col.names=T, sep="\t")
 
 #### Evann samples #### 
-evan_in = read.csv("data/evann_samples/evan_samples.csv")
-evan_in %>% filter(patient != "") %>% left_join(gisaid_phased_filt,by=c("seqid"="strain")) %>% select()
+#evan_in = read.csv("data/evann_samples/evan_samples.csv")
+#evan_in %>% filter(patient != "") %>% left_join(gisaid_phased_filt,by=c("seqid"="strain")) %>% select()
 
 ### B.1.43 frequenncies
 
-gisaid_phased_filt %>% select(-GISAID_clade,-lineage,-probability)%>%  filter(pangolin_lineage == "B.1.43") %>% filter(country == "USA") %>% group_by(division) %>% dplyr::summarise(n=n()) %>% mutate(prop=n/sum(n))
+#gisaid_phased_filt %>% select(-GISAID_clade,-lineage,-probability)%>%  filter(pangolin_lineage == "B.1.43") %>% filter(country == "USA") %>% group_by(division) %>% dplyr::summarise(n=n()) %>% mutate(prop=n/sum(n))
 
 
 ## Load the trees into R ##
@@ -106,9 +74,9 @@ for(node_in in intros_nodes){
     tmp = data.frame(node=node_in,total_la=1,total=1)
     samples_in = c(samples_in, tree_tbl$label[tree_tbl$node == node_in])
   }else{
-  {
-    samples_in = c(samples_in, tmp$label)
-    tmp = tmp %>% dplyr::summarise(node=node_in,total_la = sum(label %in% all_la_strains),total=n())
+    {
+      samples_in = c(samples_in, tmp$label)
+      tmp = tmp %>% dplyr::summarise(node=node_in,total_la = sum(label %in% all_la_strains),total=n())
     }
   }
   out_intro = rbind(out_intro,tmp)
@@ -129,7 +97,7 @@ dim(out_intro2)
 ### Identify clades of strains ###
 ### read.json tree ###
 library(rjson)
-tree_annot_all = fromJSON(file = "~/Dropbox/COVID19/ncov_new/again/ncov/results/north-america_usa_los-angeles_hets_curate_three///branch_lengths.json")
+tree_annot_all = fromJSON(file = "data/branch_lengths.json")
 introduction_clades = data.frame()
 
 for(node_in in out_intro2$node){
@@ -145,7 +113,7 @@ for(node_in in out_intro2$node){
   }else{
     tmp = tmp %>% dplyr::summarise(node=node_in,total_la_strains=n(),strain=label[1], pangolin_lineage = names(sort(table(pangolin_lineage),decreasing = T))[1],node_date=date_tree)
   }
-#  tmp$date_tree = ymd()
+  #  tmp$date_tree = ymd()
   introduction_clades = rbind(introduction_clades,tmp)
 }
 #introduction_clades$week = week(introduction_clades$node_date)
@@ -163,7 +131,7 @@ tip_list = list()
 for(i in 1:length(unique(list_strains_in_tree$region))){
   tmp_lis = list_strains_in_tree$strain[list_strains_in_tree$region == unique(list_strains_in_tree$region)[i]]
   
- # tmp_lis = tmp_lis[!tmp_lis %in% tree_tbl_la$label]
+  # tmp_lis = tmp_lis[!tmp_lis %in% tree_tbl_la$label]
   tip_list[[i]] = tmp_lis
 }
 tip_list2= list()
@@ -202,12 +170,12 @@ oneb  =ggtree(aa_2222,aes(color="grey80"),mrsd='2020-06-29')  %>% scaleClade(545
   scaleClade(5700,scale=20) + scale_color_manual(values = c("grey80")) + theme_tree2()  +
   geom_hilight(node=5450,fill="#377eb8",alpha=alpha) +  geom_hilight(node=4202,fill="#4daf4a",alpha=alpha) +  geom_hilight(node=5264,fill="#984ea3",alpha=alpha) + 
   geom_hilight(node=5700,fill="#ff7f00",alpha=alpha) +theme(text=element_text(size=30),legend.position = "none") + geom_tippoint(mapping = aes(subset = node %in% tree_tbl_la$node),shape=17,size=3,color="#000000") +   geom_nodepoint(mapping = aes(subset = node %in% out_intro2$node[out_intro2$total_la > 1]), color="#e41a1c",size=5,shape=8)
-soneb  = ggtree(aa_222_div,aes(color="grey80"),mrsd='2020-06-29')  %>% scaleClade(5450, scale=10)  %>% scaleClade(4202,scale=20) %>% scaleClade(5264,scale=20)  %>%
+soneb  = ggtree(aa_222_div,aes(color="grey80"))  %>% scaleClade(5450, scale=10)  %>% scaleClade(4202,scale=20) %>% scaleClade(5264,scale=20)  %>%
   scaleClade(5700,scale=20) + scale_color_manual(values = c("grey80")) + theme_tree2()  +
   geom_hilight(node=5450,fill="#377eb8",alpha=alpha) +  geom_hilight(node=4202,fill="#4daf4a",alpha=alpha) +  geom_hilight(node=5264,fill="#984ea3",alpha=alpha) + 
   geom_hilight(node=5700,fill="#ff7f00",alpha=alpha) +theme(text=element_text(size=30),legend.position = "none") + geom_tippoint(mapping = aes(subset = node %in% tree_tbl_la$node),shape=17,size=3,color="#000000") +   geom_nodepoint(mapping = aes(subset = node %in% out_intro2$node[out_intro2$total_la > 1]), color="#e41a1c",size=5,shape=8)
 plot_grid(sonea,soneb + theme(legend.position = "none") ,labels="AUTO", label_size = 24) 
-ggsave("paper/figures//S5.png",width=16,height=12,dpi=150)
+ggsave("paper/figures//S4.png",width=16,height=12,dpi=150)
 
 cowplot::plot_grid(onea,oneb,nrow=1,ncol=2,labels="AUTO",label_size = 30)
 
@@ -218,6 +186,10 @@ onea + theme(legend.position = "none")
 ggsave("figures/1_a.pdf",width=24/2,height=18/2,dpi=300)
 oneb
 ggsave("figures/1_b.pdf",width=24/2,height=18/2,dpi=300)
+
+
+cowplot::plot_grid(sonea,soneb,nrow=1,ncol=2,labels="AUTO",label_size = 30)
+ggsave("figures/S4.pdf",width=24/2,height=18/2,dpi=300)
 
 #gisaid_local = gisaid_phased_filt
 #gisaid_local$week = week(gisaid_local$date_fix)
@@ -291,31 +263,30 @@ cowplot::plot_grid(onea,oneb,p1,pf,nrow=2,ncol=2,labels="AUTO",label_size = 30)
 
 ggsave("figures/1.png",width=24,height=18,dpi=300)
 #ggsave("figures/1_a.png",width=24,height=18,dpi=300)
-pf
-ggsave("figures/1_d.pdf",width=24/2,height=18/2,dpi=300)
+#pf
+#ggsave("figures/1_d.pdf",width=24/2,height=18/2,dpi=300)
 #gisaid_
-p1
-ggsave("figures/1_c.pdf",width=24/2,height=18/2,dpi=300)
+#p1
+#ggsave("figures/1_c.pdf",width=24/2,height=18/2,dpi=300)
 
-cowplot::plot_grid(p1,pf,ncol=2)
 
 #color_map = RColorBrewer::brewer.pal(length(need_colors_next) + 2  , name ="Set3")
 #names(color_map) = c(need_colors_next,"Other")
-color_map = RColorBrewer::brewer.pal(length(need_colors_next) + 2  , name ="Set3")
-color_map = color_map[-c(2)]
-names(color_map) = c(need_colors_next,"Other B.1")
-scale_map3 = scale_fill_manual(name="Lineage",values = color_map)
+#color_map = RColorBrewer::brewer.pal(length(need_colors_next) + 2  , name ="Set3")
+#color_map = color_map[-c(2)]
+#names(color_map) = c(need_colors_next,"Other B.1")
+#scale_map3 = scale_fill_manual(name="Lineage",values = color_map)
 
-pitro = introduction_clades %>% filter(week >= week_filter) %>% ggplot(aes(x=node_date_fix,fill=(pangolin_simple2)))+ geom_histogram(binwidth = 7)  + scale_map3 + theme_bw()  + scale_x_date(limits=as.Date(c("2020-04-20","2020-06-30"))) + theme(text=element_text(size=20))  + xlab("") +
-  ylab("Count") + ggtitle("LA County Introductions")
-gisaid_local$week = week(gisaid_local$date_fix)
-pp_count = gisaid_local %>%  filter(location == "Los Angeles County") %>% filter(week >= week_filter) %>% ggplot(aes(x=date_fix,fill=pangolin_simple2)) + geom_histogram(binwidth = 7)  + scale_map3 + theme_bw()+ theme(text=element_text(size=20)) + xlab("Date") + ylab("Count") + ggtitle("LA County Genomes")
-pp_count_leg = get_legend(pp_count)
+#pitro = introduction_clades %>% filter(week >= week_filter) %>% ggplot(aes(x=node_date_fix,fill=(pangolin_simple2)))+ geom_histogram(binwidth = 7)  + scale_map3 + theme_bw()  + scale_x_date(limits=as.Date(c("2020-04-20","2020-06-30"))) + theme(text=element_text(size=20))  + xlab("") +
+#  ylab("Count") + ggtitle("LA County Introductions")
+#gisaid_local$week = week(gisaid_local$date_fix)
+#pp_count = gisaid_local %>%  filter(location == "Los Angeles County") %>% filter(week >= week_filter) %>% ggplot(aes(x=date_fix,fill=pangolin_simple2)) + geom_histogram(binwidth = 7)  + scale_map3 + theme_bw()+ theme(text=element_text(size=20)) + xlab("Date") + ylab("Count") + ggtitle("LA County Genomes")
+#pp_count_leg = get_legend(pp_count)
 #get
-pg = cowplot::plot_grid(pitro + theme(legend.position = "none"),pp_count  +  theme(legend.position = "none"),nrow=2,labels = "AUTO",label_size = 20)
-library(cowplot)
-plot_grid(pg, pp_count_leg,rel_widths = c(1,.4))
-ggsave("paper/figures//S6.png", width=8,height=8,dpi=150)
+#pg = cowplot::plot_grid(pitro + theme(legend.position = "none"),pp_count  +  theme(legend.position = "none"),nrow=2,labels = "AUTO",label_size = 20)
+#library(cowplot)
+#plot_grid(pg, pp_count_leg,rel_widths = c(1,.4))
+#ggsave("paper/figures//S6.png", width=8,height=8,dpi=150)
 
 #cowplot::plot_grid(p1,p2)
 #ggsave("figures/2_new.png",width = 10,height=8)
@@ -370,7 +341,7 @@ colnames(states)[5] <- "County"
 county$County <- (stri_trans_totitle(county$subregion))
 mid_range <- function(x) mean(range(x,na.rm=TRUE))
 centres_county <- ddply(county, .(subregion),
-                 colwise(mid_range,.(lat,long)))
+                        colwise(mid_range,.(lat,long)))
 freq_cali_data = freq_cali_wash %>% dplyr::inner_join(centres_county,by=c("count_lower"="subregion")) %>% mutate(count_upper=toupper(count_lower)) 
 freq_cali_data= pivot_wider(freq_cali_data,id_cols=c("count_lower","lat","long"),names_from="Lineage",values_from=c("freq","total"))
 freq_cali_data =freq_cali_data %>% mutate(County=str_to_title(count_lower))
@@ -391,56 +362,56 @@ pc = ggplot() + geom_polygon(data=county,aes(group=subregion,x=long,y=lat),fill=
 
 
 pa =  ggplot() + geom_polygon(data=washington,aes(group=subregion,x=long,y=lat),fill="white",color="black",size=1) + coord_map()+ theme_map()
- pbb = ggplot() + geom_polygon(data=cali_county,aes(group=subregion,x=long,y=lat),fill="white",color="black",size=1) + coord_map()+ theme_map()
- ggplot() + geom_polygon(data=states,aes(group=County,x=long,y=lat),fill="white",color="black") + coord_map()+ theme_map()
- 
- 
-plot_grid(pa,pbb)
-ggsave("figures/cali_wash.png",width=16,height=12,dpi=300)
+pbb = ggplot() + geom_polygon(data=cali_county,aes(group=subregion,x=long,y=lat),fill="white",color="black",size=1) + coord_map()+ theme_map()
+ggplot() + geom_polygon(data=states,aes(group=County,x=long,y=lat),fill="white",color="black") + coord_map()+ theme_map()
 
-pg = plot_grid(pb + theme(plot.margin = unit(c(0, 0, 0, 0), "cm")),pc + theme(plot.margin = unit(c(0, 0, 0, 0), "cm")))
-plot_grid(pa + theme(plot.margin = unit(c(0, 0, 0, 0), "cm")),pg,three_a,p_la,labels="AUTO",ncol=2,rel_heights = c(1,.8),label_size=30)
+
+#plot_grid(pa,pbb)
+#ggsave("figures/cali_wash.png",width=16,height=12,dpi=300)
+
+#pg = plot_grid(pb + theme(plot.margin = unit(c(0, 0, 0, 0), "cm")),pc + theme(plot.margin = unit(c(0, 0, 0, 0), "cm")))
+#plot_grid(pa + theme(plot.margin = unit(c(0, 0, 0, 0), "cm")),pg,three_a,p_la,labels="AUTO",ncol=2,rel_heights = c(1,.8),label_size=30)
 plot_grid(three_a,p_la,labels="AUTO",ncol=2,rel_heights = c(1,.8))
 
-ggsave("figures/2_new2.pdf",width=16,height=8,dpi=150)
+ggsave("figures/2cd.pdf",width=16,height=8,dpi=150)
 #ggplot() + geom_map(data=counnty)
 #gisaid_phased_filt %>% filter(location == "Los Angeles County") %>% mutate(Lineage=factor(ifelse(pangolin_lineage == "B.1.43","B.1.43","Other"),levels=c("Other","B.1.43"))) %>% group_by(month,Lineage) %>% summarise(n=n()) %>% mutate(freq = n/sum(n),total=sum(n)) %>% filter(Lineage == "B.1.43") %>%
- #ggplot(aes(y=freq,x=month,label=total)) + geom_line() + geom_point() + geom_text_repel() + theme_bw()
- 
-locales = c("Whatcom County","San Diego","Contra Costa County","Skagit County", "Imperial County","Orange County CA","San Luis Obispo County","Ventura County")
+#ggplot(aes(y=freq,x=month,label=total)) + geom_line() + geom_point() + geom_text_repel() + theme_bw()
 
-p1 = gisaid_phased_filt %>% filter(location %in% locales) %>% mutate(Lineage=factor(ifelse(pangolin_lineage == "B.1.43","B.1.43","Other"),levels=c("Other","B.1.43"))) %>% group_by(month,Lineage) %>% dplyr::summarise(n=n()) %>% dplyr::mutate(freq = n/sum(n),total=(n)) %>% filter(Lineage == "B.1.43") %>%
-  ggplot(aes(y=freq,x=month,label=total)) + geom_line() + geom_point() + geom_text_repel() + scale_x_continuous(labels=month_label,breaks=month_numeric) + theme_bw() + theme(text=element_text(size=30)) + xlab("Month") + ylab("B.1.43 frequency")  + ylim(c(0,.25))
-p2 = gisaid_phased_filt %>% filter(location %in% locales) %>% mutate(Lineage=factor(ifelse(pangolin_lineage == "B.1.43","B.1.43","Other"),levels=c("Other","B.1.43"))) %>% group_by(month,location,Lineage) %>% dplyr::summarise(n=n()) %>% dplyr::mutate(freq = n/sum(n),total=(n)) %>% filter(Lineage == "B.1.43") %>%
-  ggplot(aes(y=freq,x=month,label=total, group=location)) + geom_line() + geom_point() + geom_text_repel(size=10) + scale_x_continuous(labels=month_label,breaks=month_numeric) + theme_bw() + theme(text=element_text(size=30)) + xlab("Month") + ylab("B.1.43 frequency") + facet_wrap(~location)
- 
-gisaid_phased_filt %>% filter(location %in% locales) %>%
-                   mutate(Lineage=factor(ifelse(pangolin_lineage == "B.1.43","B.1.43","Other"),levels=c("Other","B.1.43"))) %>%
-                  group_by(month,location,Lineage) %>%
-                  dplyr::summarise(n=n()) %>%
-                  dplyr::mutate(freq = n/sum(n),total=(n)) 
+#locales = c("Whatcom County","San Diego","Contra Costa County","Skagit County", "Imperial County","Orange County CA","San Luis Obispo County","Ventura County")
 
-plot_grid(p1,p2,rel_widths = c(0.8,1.4),labels="AUTO",label_size = 24)
-ggsave(width=16,height=12,file="paper/figures//S8.png",dpi=150)
-library(forcats)
+#p1 = gisaid_phased_filt %>% filter(location %in% locales) %>% mutate(Lineage=factor(ifelse(pangolin_lineage == "B.1.43","B.1.43","Other"),levels=c("Other","B.1.43"))) %>% group_by(month,Lineage) %>% dplyr::summarise(n=n()) %>% dplyr::mutate(freq = n/sum(n),total=(n)) %>% filter(Lineage == "B.1.43") %>%
+#  ggplot(aes(y=freq,x=month,label=total)) + geom_line() + geom_point() + geom_text_repel() + scale_x_continuous(labels=month_label,breaks=month_numeric) + theme_bw() + theme(text=element_text(size=30)) + xlab("Month") + ylab("B.1.43 frequency")  + ylim(c(0,.25))
+#p2 = gisaid_phased_filt %>% filter(location %in% locales) %>% mutate(Lineage=factor(ifelse(pangolin_lineage == "B.1.43","B.1.43","Other"),levels=c("Other","B.1.43"))) %>% group_by(month,location,Lineage) %>% dplyr::summarise(n=n()) %>% dplyr::mutate(freq = n/sum(n),total=(n)) %>% filter(Lineage == "B.1.43") %>%
+#  ggplot(aes(y=freq,x=month,label=total, group=location)) + geom_line() + geom_point() + geom_text_repel(size=10) + scale_x_continuous(labels=month_label,breaks=month_numeric) + theme_bw() + theme(text=element_text(size=30)) + xlab("Month") + ylab("B.1.43 frequency") + facet_wrap(~location)
+
+#gisaid_phased_filt %>% filter(location %in% locales) %>%
+ # mutate(Lineage=factor(ifelse(pangolin_lineage == "B.1.43","B.1.43","Other"),levels=c("Other","B.1.43"))) %>%
+#  group_by(month,location,Lineage) %>%
+#  dplyr::summarise(n=n()) %>%
+ # dplyr::mutate(freq = n/sum(n),total=(n)) 
+
+#plot_grid(p1,p2,rel_widths = c(0.8,1.4),labels="AUTO",label_size = 24)
+#ggsave(width=16,height=12,file="paper/figures//S8.png",dpi=150)
+#library(forcats)
 #gisaid_phased_filt %>% filter(location %in% locales) %>% mutate(Lineage=factor(ifelse(pangolin_lineage == "B.1.43","B.1.43","Other"),levels=c("Other","B.1.43"))) %>% group_by(month,location,Lineage) %>% summarise(n=n()) %>% mutate(freq = n/sum(n),total=sum(n)) %>% filter(Lineage == "B.1.43") %>%
 #  ggplot(aes(y=freq,x=month,label=total, group=location)) + geom_line() + geom_point() + geom_text_repel() + scale_x_continuous(labels=month_label,breaks=month_numeric) + theme_bw() + theme(text=element_text(size=30)) + xlab("Month") + ylab("B.1.43 frequency") + facet_wrap(~location)
 
-p1 = gisaid_local %>% filter(location %in% locales) %>% mutate(b_1_43=ifelse(pangolin_lineage == "B.1.43",T,F))  %>% mutate(Location=location) %>% filter(b_1_43)%>% ggplot(aes(x=date_fix,fill=Location)) + geom_histogram(binwidth = 14)  + 
-  theme_bw()  + theme(text=element_text(size=20))  + ggtitle("B.1.43") + xlab("Date") + ylab("Count") + scale_fill_brewer(palette = "Set2") +   scale_x_date(limits=as.Date(c("2020-01-15","2020-06-30"))) 
+#p1 = gisaid_local %>% filter(location %in% locales) %>% mutate(b_1_43=ifelse(pangolin_lineage == "B.1.43",T,F))  %>% mutate(Location=location) %>% filter(b_1_43)%>% ggplot(aes(x=date_fix,fill=Location)) + geom_histogram(binwidth = 14)  + 
+#  theme_bw()  + theme(text=element_text(size=20))  + ggtitle("B.1.43") + xlab("Date") + ylab("Count") + scale_fill_brewer(palette = "Set2") +   scale_x_date(limits=as.Date(c("2020-01-15","2020-06-30"))) 
 
-p2 = gisaid_local %>% filter(location %in% locales) %>% mutate(b_1_43=ifelse(pangolin_lineage == "B.1.43",T,F)) %>% mutate(Location=location)  %>% filter(!b_1_43)%>% ggplot(aes(x=date_fix,fill=location)) + geom_histogram(binwidth = 14)  + 
-  theme_bw()  + theme(text=element_text(size=20))  + ggtitle("Other lineages") + xlab("Date") + ylab("Count") + scale_fill_brewer(palette = "Set2") +   scale_x_date(limits=as.Date(c("2020-01-15","2020-06-30"))) 
-leg = get_legend(p1)
-library(forcats)
+#p2 = gisaid_local %>% filter(location %in% locales) %>% mutate(b_1_43=ifelse(pangolin_lineage == "B.1.43",T,F)) %>% mutate(Location=location)  %>% filter(!b_1_43)%>% ggplot(aes(x=date_fix,fill=location)) + geom_histogram(binwidth = 14)  + 
+#  theme_bw()  + theme(text=element_text(size=20))  + ggtitle("Other lineages") + xlab("Date") + ylab("Count") + scale_fill_brewer(palette = "Set2") +   scale_x_date(limits=as.Date(c("2020-01-15","2020-06-30"))) 
+#leg = get_legend(p1)
+#library(forcats)
 
-pg= plot_grid(p1 + theme(legend.position = "none"),p2 + theme(legend.position = "none"),labels="AUTO",nrow=2,rel_widths = c(1,1),label_size = 24)
-plot_grid(pg, leg,label_size = 24,rel_widths = c(3,1))
-ggsave("paper/figures/S7.png",width=12,height=8,dpi=150)
-a = read.delim("../ncov_new/again/ncov/results/4710.txt", header=F)
-aaa =  a %>% inner_join(gisaid_phased_filt,by=c("V1"="strain"))
-table(aaa$pangolin_lineage)
-aaa %>% filter(pangolin_lineage == "B.1.1") %>% select(V1,date,pangolin_lineage) %>% dplyr::rename(strain=V1) %>% write.table("paper/tables/S10.tsv",sep="\t",col.names=T,row.names=F)
+#pg= plot_grid(p1 + theme(legend.position = "none"),p2 + theme(legend.position = "none"),labels="AUTO",nrow=2,rel_widths = c(1,1),label_size = 24)
+#plot_grid(pg, leg,label_size = 24,rel_widths = c(3,1))
+#ggsave("paper/figures/S7.png",width=12,height=8,dpi=150)
+#a = read.delim("../ncov_new/again/ncov/results/4710.txt", header=F)
+#aaa =  a %>% inner_join(gisaid_phased_filt,by=c("V1"="strain"))
+#table(aaa$pangolin_lineage)
+#aaa %>% filter(pangolin_lineage == "B.1.1") %>% select(V1,date,pangolin_lineage) %>% dplyr::rename(strain=V1) %>% write.table("paper/tables/S10.tsv",sep="\t",col.names=T,row.names=F)
 
 #View(aaa)
 #snp = read.delim("~/Dropbox/COVID19/ncov_new/again/ncov/results/sequence-diagnostics.tsv")
